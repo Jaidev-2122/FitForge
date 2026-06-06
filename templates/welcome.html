@@ -1,0 +1,131 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="ob-wrap">
+  <div class="ob-card">
+
+    <!-- Step A: name -->
+    <div id="welcome-step">
+      <div style="text-align:center; margin-bottom:28px;">
+        <div style="font-size:34px; font-weight:700; color:var(--accent-1); letter-spacing:-1px;">FitForge</div>
+        <div style="font-size:13px; color:var(--text2); margin-top:4px;">Your AI fitness companion that evolves with you</div>
+      </div>
+      <div class="ob-q" style="text-align:center;">What should I call you?</div>
+      <input class="input" id="name-input" placeholder="Your name" style="margin-bottom:16px; text-align:center;" autofocus>
+      <button class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;" onclick="startQuiz()">Let's go →</button>
+    </div>
+
+    <!-- Step B: quiz -->
+    <div id="quiz" style="display:none;">
+      <div class="ob-progress" id="progress"></div>
+      <div class="ob-tier" id="tier"></div>
+      <div class="ob-q" id="question"></div>
+      <div id="answer-area"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" id="back-btn" onclick="prev()">← Back</button>
+        <button class="btn btn-primary" id="next-btn" onclick="next()">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step C: building -->
+    <div id="builder" style="display:none; text-align:center;">
+      <div style="width:28px; height:28px; border:3px solid var(--border2); border-top-color:var(--accent-1); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 16px;"></div>
+      <div id="build-msg" style="color:var(--text1); font-size:14px;">Building your plan...</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  {key:"age", q:"How old are you?", type:"number", tier:1},
+  {key:"biological_sex", q:"Biological sex? (affects training response)", type:"choice", options:["male","female","other"], tier:1},
+  {key:"height_cm", q:"Your height in cm?", type:"number", tier:1},
+  {key:"weight_kg", q:"Current weight in kg?", type:"number", tier:1},
+  {key:"country", q:"Which country are you in? (for local food ideas)", type:"text", tier:1},
+  {key:"equipment", q:"What equipment can you use?", type:"choice", options:["Full gym","Home + dumbbells","Bodyweight only","Mix of home + gym"], tier:1},
+  {key:"injuries", q:"Any injuries or limitations to work around?", type:"text", tier:1, optional:true},
+  {key:"history", q:"Have you trained before?", type:"choice", options:["Never","Used to, stopped","Currently active"], tier:2},
+  {key:"why_stopped", q:"If you stopped before — what got in the way?", type:"text", tier:2, optional:true},
+  {key:"days_per_week", q:"Realistically, how many days a week can you train?", type:"choice", options:["2","3","4","5","6"], tier:2},
+  {key:"session_length", q:"How long per session?", type:"choice", options:["30 min","45 min","60 min","90 min"], tier:2},
+  {key:"goal", q:"Main goal right now?", type:"choice", options:["Lose fat / tone","Build muscle","Both","General fitness"], tier:2},
+  {key:"energy", q:"Day-to-day energy level?", type:"choice", options:["Low","Average","High"], tier:2},
+  {key:"sleep", q:"Hours of sleep on a typical night?", type:"number", tier:2},
+];
+
+let step = 0;
+const answers = {};
+
+function startQuiz() {
+  const name = document.getElementById("name-input").value.trim();
+  if (!name) { document.getElementById("name-input").focus(); return; }
+  answers.name = name;
+  document.getElementById("welcome-step").style.display = "none";
+  document.getElementById("quiz").style.display = "block";
+  render();
+}
+
+function render() {
+  const q = QUESTIONS[step];
+  document.getElementById("progress").innerHTML = QUESTIONS.map((_, i) => `<div class="${i <= step ? 'on' : ''}"></div>`).join("");
+  document.getElementById("tier").textContent = q.tier === 1 ? "The basics" : "About your training";
+  document.getElementById("question").textContent = q.q;
+  document.getElementById("back-btn").style.visibility = step === 0 ? "hidden" : "visible";
+  const area = document.getElementById("answer-area");
+  const nextBtn = document.getElementById("next-btn");
+  const isLast = step === QUESTIONS.length - 1;
+  nextBtn.textContent = isLast ? "Build my plan" : "Next →";
+
+  if (q.type === "choice") {
+    nextBtn.style.display = "none";
+    area.innerHTML = `<div class="ob-options">` + q.options.map(o =>
+      `<button class="ob-opt ${answers[q.key]===o?'sel':''}" onclick="choose('${o.replace(/'/g,"\\'")}')">${o}</button>`).join("") + `</div>`;
+  } else {
+    nextBtn.style.display = "inline-flex";
+    area.innerHTML = `<input class="input" id="ob-input" type="${q.type==='number'?'number':'text'}" placeholder="Type your answer..." value="${answers[q.key]||''}" style="margin-bottom:20px;">`
+      + (q.optional ? `<button class="btn btn-ghost btn-sm" onclick="skip()" style="margin-bottom:12px;">Skip</button>` : "");
+    const inp = document.getElementById("ob-input");
+    inp.focus();
+    inp.addEventListener("keydown", e => { if (e.key === "Enter") next(); });
+  }
+}
+
+function choose(val) { answers[QUESTIONS[step].key] = val; advance(); }
+function skip() { answers[QUESTIONS[step].key] = ""; advance(); }
+function next() {
+  const q = QUESTIONS[step];
+  if (q.type !== "choice") {
+    const v = document.getElementById("ob-input").value;
+    if (!v && !q.optional) return;
+    answers[q.key] = v;
+  }
+  advance();
+}
+function advance() {
+  if (step === QUESTIONS.length - 1) { build(); return; }
+  step++; render();
+}
+function prev() { if (step > 0) { step--; render(); } }
+
+async function build() {
+  document.getElementById("quiz").style.display = "none";
+  document.getElementById("builder").style.display = "block";
+  const msgs = ["Saving your profile...", "AI is building your pilot-week routine...", "Generating your nutrition plan..."];
+  let mi = 0;
+  const msgEl = document.getElementById("build-msg");
+  const iv = setInterval(() => { mi = (mi + 1) % msgs.length; msgEl.textContent = msgs[mi]; }, 2500);
+  try {
+    const res = await fetch("{{ url_for('onboarding_complete') }}", {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(answers)
+    });
+    const data = await res.json();
+    clearInterval(iv);
+    if (data.ok) { location.href = "{{ url_for('dashboard') }}"; }
+    else { msgEl.textContent = "Error: " + (data.error || "failed") + ". Is your Gemini key set?"; }
+  } catch (e) {
+    clearInterval(iv);
+    msgEl.textContent = "Network error: " + e.message;
+  }
+}
+</script>
+{% endblock %}

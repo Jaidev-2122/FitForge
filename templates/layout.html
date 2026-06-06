@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="{{ shell.theme_mode if shell else 'dark' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>FitForge</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+
+  <!-- iOS full-screen PWA support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FitForge">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
+  <!-- Android / Chrome theme colour -->
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    :root {
+      --accent-1: {{ shell.theme_accent_1 if shell else '#c8f55a' }};
+      --accent-2: {{ shell.theme_accent_2 if shell else '#5599ff' }};
+    }
+    /* Safe area insets for iPhone notch / home bar */
+    .page {
+      padding-left: max(32px, env(safe-area-inset-left));
+      padding-right: max(32px, env(safe-area-inset-right));
+      padding-bottom: max(28px, env(safe-area-inset-bottom));
+    }
+    .sidebar {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="flash">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+    {% endif %}
+  {% endwith %}
+  {% block body %}{% endblock %}
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/sw.js')
+        .catch(err => console.warn('SW registration failed:', err));
+    }
+  </script>
+</body>
+</html>

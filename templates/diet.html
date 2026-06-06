@@ -1,0 +1,133 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Diet Tracker</div>
+    <div class="page-sub">Log food manually. Search the database to autofill macros, or type your own.</div>
+  </div>
+
+  <div class="grid-4 mb16">
+    {% set m = [('Calories','kcal','kcal_target','var(--accent-1)'),('Protein','protein','protein_g_target','var(--accent-2)'),('Carbs','carbs','carbs_g_target','#ff9944'),('Fat','fat','fat_g_target','#ff5599')] %}
+    {% for label,key,tkey,color in m %}
+    {% set tval = target[tkey] if target else None %}
+    <div class="macro">
+      <div class="stat-label">{{ label }}</div>
+      <div class="macro-val">{{ totals[key] }}<small>{% if tval %} / {{ tval }}{% endif %} {{ 'kcal' if key=='kcal' else 'g' }}</small></div>
+      {% if tval %}<div class="bar"><div class="bar-fill" style="width:{{ ((totals[key]/tval*100) if tval else 0)|round(0,'floor') }}%; background:{{ color }};"></div></div>{% else %}<div class="page-sub">no target</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="card mb16">
+    <div class="section-title">Add food</div>
+
+    <!-- optional search to autofill -->
+    <div style="position:relative; margin-bottom:14px;">
+      <input class="input" id="food-search" placeholder="Search the database to autofill (optional)..." oninput="searchFood()" autocomplete="off">
+      <div id="search-results" style="position:absolute; left:0; right:0; top:100%; z-index:10; background:var(--bg1); border:1px solid var(--border2); border-radius:var(--radius); margin-top:4px; overflow:hidden;"></div>
+    </div>
+
+    <!-- manual entry form -->
+    <form method="post" action="{{ url_for('diet_log') }}">
+      <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px; margin-bottom:10px;">
+        <div><label class="page-sub">Food name</label><input class="input" name="name" id="f-name" required></div>
+        <div><label class="page-sub">Meal</label>
+          <select class="input" name="meal_type">
+            <option value="breakfast">Breakfast</option><option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option><option value="snack" selected>Snack</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:12px;">
+        <div><label class="page-sub">Grams</label><input class="input" name="grams" id="f-grams" type="number" step="1" value="100"></div>
+        <div><label class="page-sub">Calories</label><input class="input" name="kcal" id="f-kcal" type="number" step="1" required></div>
+        <div><label class="page-sub">Protein g</label><input class="input" name="protein" id="f-protein" type="number" step="0.1"></div>
+        <div><label class="page-sub">Carbs g</label><input class="input" name="carbs" id="f-carbs" type="number" step="0.1"></div>
+        <div><label class="page-sub">Fat g</label><input class="input" name="fat" id="f-fat" type="number" step="0.1"></div>
+      </div>
+      <button class="btn btn-primary" type="submit">Add to log</button>
+    </form>
+  </div>
+
+  <div class="card mb16">
+    <div class="section-title">
+      Today's meals
+      {% if logs %}<button class="btn btn-ghost btn-sm" onclick="analyse()">✨ AI analysis</button>{% endif %}
+    </div>
+    {% if not logs %}
+      <div class="page-sub">No meals logged yet today.</div>
+    {% else %}
+      {% for l in logs %}
+      <div class="ex-row" style="margin-bottom:8px;">
+        <div style="flex:1;">
+          <div class="ex-name">{{ l.custom_name }}{% if l.quantity_g %} <span style="font-size:11px; color:var(--text2);">· {{ l.quantity_g|round|int }}g</span>{% endif %}</div>
+          <div class="ex-detail">{{ l.kcal|round|int }} kcal · P {{ l.protein_g|round|int }} · C {{ l.carbs_g|round|int }} · F {{ l.fat_g|round|int }}</div>
+        </div>
+        <form method="post" action="{{ url_for('diet_delete') }}"><input type="hidden" name="id" value="{{ l.id }}"><button class="btn btn-ghost btn-sm" type="submit">✕</button></form>
+      </div>
+      {% endfor %}
+      <div id="analysis-out" style="display:none; margin-top:12px; padding:12px; background:var(--accent-1-dim); border-radius:var(--radius); font-size:13px; line-height:1.6;"></div>
+    {% endif %}
+  </div>
+
+  {% if target and target.food_ideas %}
+  <div class="card">
+    <div class="section-title">Cheap, easy food ideas for you</div>
+    <div class="lib-grid">
+      {% for f in target.food_ideas %}
+      <div style="padding:10px 12px; background:var(--bg2); border-radius:var(--radius); border:1px solid var(--border);">
+        <div style="font-size:13px; font-weight:500;">{{ f.name }}</div>
+        <div class="page-sub" style="margin-top:2px;">{{ f.why }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+let timer = null, per100 = null;
+function searchFood() {
+  clearTimeout(timer);
+  const q = document.getElementById("food-search").value;
+  const box = document.getElementById("search-results");
+  if (!q) { box.innerHTML = ""; return; }
+  timer = setTimeout(async () => {
+    const res = await fetch("{{ url_for('diet_search') }}?q=" + encodeURIComponent(q));
+    const rows = await res.json();
+    box.innerHTML = rows.map(r => `<div style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border);"
+      onclick='pick(${JSON.stringify(r).replace(/'/g,"&#39;")})'>
+      <div style="font-size:13px;">${r.name}</div>
+      <div style="font-size:11px; color:var(--text2);">${r.kcal_per_100g} kcal · P${r.protein_g} C${r.carbs_g} F${r.fat_g} per 100g</div>
+    </div>`).join("") || `<div style="padding:10px 12px; color:var(--text2); font-size:12px;">No matches</div>`;
+  }, 250);
+}
+function pick(r) {
+  per100 = r;
+  document.getElementById("food-search").value = "";
+  document.getElementById("search-results").innerHTML = "";
+  document.getElementById("f-name").value = r.name;
+  recompute();
+}
+function recompute() {
+  if (!per100) return;
+  const g = parseFloat(document.getElementById("f-grams").value || 0);
+  const f = g / 100;
+  document.getElementById("f-kcal").value = Math.round((per100.kcal_per_100g||0) * f);
+  document.getElementById("f-protein").value = +((per100.protein_g||0) * f).toFixed(1);
+  document.getElementById("f-carbs").value = +((per100.carbs_g||0) * f).toFixed(1);
+  document.getElementById("f-fat").value = +((per100.fat_g||0) * f).toFixed(1);
+}
+document.getElementById("f-grams").addEventListener("input", recompute);
+
+async function analyse() {
+  const out = document.getElementById("analysis-out");
+  out.style.display = "block"; out.textContent = "Analysing your week...";
+  try {
+    const res = await fetch("{{ url_for('api_analysis') }}", { method:"POST" });
+    const d = await res.json();
+    out.textContent = d.analysis || d.error || "Could not analyse.";
+  } catch(e) { out.textContent = "Could not reach AI."; }
+}
+</script>
+{% endblock %}

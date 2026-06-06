@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% block body %}
+<!-- Mobile EXP strip (visible only on small screens) -->
+{% if shell %}
+<div class="mobile-exp" style="display:none;">
+  <span>{{ shell.display_name or 'You' }}</span>
+  <div class="bar"><div class="bar-fill" style="width:{{ ((shell.total_exp / shell.exp_to_next * 100) if shell.exp_to_next else 0)|round(0,'floor') }}%"></div></div>
+  <span>{{ shell.total_exp }} EXP</span>
+</div>
+{% endif %}
+
+<div class="app">
+  <nav class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-text">FitForge</div>
+      <div class="sb-logo-sub">AI Fitness OS</div>
+    </div>
+    <div class="sb-nav">
+      <a href="{{ url_for('dashboard') }}" class="sb-item {{ 'active' if active_path == '/dashboard' }}">▦ Dashboard</a>
+      <a href="{{ url_for('workout') }}" class="sb-item {{ 'active' if active_path == '/workout' }}">▶ Today's Workout</a>
+      <a href="{{ url_for('planner') }}" class="sb-item {{ 'active' if active_path == '/planner' }}">▤ Weekly Planner</a>
+      <a href="{{ url_for('statistics') }}" class="sb-item {{ 'active' if active_path == '/statistics' }}">▲ Statistics</a>
+      <a href="{{ url_for('lifestyle') }}" class="sb-item {{ 'active' if active_path == '/lifestyle' }}">♥ Lifestyle</a>
+      <a href="{{ url_for('diet') }}" class="sb-item {{ 'active' if active_path == '/diet' }}">◍ Diet Tracker</a>
+      <a href="{{ url_for('library') }}" class="sb-item {{ 'active' if active_path == '/library' }}">▣ Exercise Library</a>
+      <a href="{{ url_for('motivation') }}" class="sb-item {{ 'active' if active_path == '/motivation' }}">★ Motivation</a>
+      <a href="{{ url_for('profile_page') }}" class="sb-item {{ 'active' if active_path == '/profile' }}">◑ Profile</a>
+      <a href="{{ url_for('settings') }}" class="sb-item {{ 'active' if active_path == '/settings' }}">⚙ Settings</a>
+    </div>
+    <div class="sb-bottom">
+      {% if shell %}
+      <div class="sb-exp">
+        <div class="sb-exp-row"><span>EXP</span><span>{{ shell.total_exp }} / {{ shell.exp_to_next }}</span></div>
+        <div class="bar"><div class="bar-fill" style="width: {{ ((shell.total_exp / shell.exp_to_next * 100) if shell.exp_to_next else 0)|round(0,'floor') }}%"></div></div>
+      </div>
+      <div class="sb-user">
+        <a href="{{ url_for('profile_page') }}" class="avatar" style="text-decoration:none;">{{ (shell.display_name or 'U')[:2]|upper }}</a>
+        <div class="sb-user-info">
+          <div class="sb-user-name">{{ shell.display_name or 'User' }}</div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <form method="post" action="{{ url_for('reset') }}" onsubmit="return confirm('Start over and re-take the quiz? This clears your current data.')">
+              <button type="submit" class="sb-user-logout" style="background:none; border:none; padding:0; cursor:pointer;">Start over</button>
+            </form>
+            <a href="{{ url_for('logout') }}" class="sb-user-logout">Log out</a>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </nav>
+  <main class="main">
+    {% block main %}{% endblock %}
+  </main>
+</div>
+
+<!-- Mobile bottom nav bar -->
+<nav class="bottom-nav" style="display:none;">
+  <a href="{{ url_for('dashboard') }}" class="{{ 'active' if active_path == '/dashboard' }}"><span>▦</span>Home</a>
+  <a href="{{ url_for('workout') }}" class="{{ 'active' if active_path == '/workout' }}"><span>▶</span>Workout</a>
+  <a href="{{ url_for('diet') }}" class="{{ 'active' if active_path == '/diet' }}"><span>◍</span>Diet</a>
+  <a href="{{ url_for('lifestyle') }}" class="{{ 'active' if active_path == '/lifestyle' }}"><span>♥</span>Lifestyle</a>
+  <a href="{{ url_for('profile_page') }}" class="{{ 'active' if active_path == '/profile' }}"><span>◑</span>Profile</a>
+</nav>
+{% endblock %}

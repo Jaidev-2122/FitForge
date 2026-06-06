@@ -1,0 +1,69 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Lifestyle</div>
+    <div class="page-sub">Recovery, hydration and sleep — log daily for better AI calibration</div>
+  </div>
+
+  <form method="post" action="{{ url_for('lifestyle_save') }}">
+    <div class="grid-2 mb16">
+      <div class="card">
+        <div class="section-title">Water intake</div>
+        <div class="page-sub" style="margin-bottom:8px;">Goal: {{ water_goal }} glasses (250ml each)</div>
+        <div class="water" id="cups"></div>
+        <input type="hidden" name="water" id="water-val" value="{{ log.water_glasses or 0 }}">
+        <div style="margin-top:10px; font-size:13px; color:var(--text1);">
+          <span id="water-count" style="font-size:18px; font-weight:700; color:var(--accent-2);">{{ log.water_glasses or 0 }}</span>
+          <span style="color:var(--text2);"> / {{ water_goal }} glasses</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Sleep last night</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div><div id="sleep-disp" style="font-size:22px; font-weight:700;">{{ log.sleep_hours or 7.5 }}h</div><div class="page-sub">goal {{ sleep_goal }}h</div></div>
+          <input type="range" name="sleep" min="4" max="10" step="0.5" value="{{ log.sleep_hours or 7.5 }}"
+                 style="flex:1; accent-color:var(--accent-1);" oninput="document.getElementById('sleep-disp').textContent=this.value+'h'">
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          {% for q in ['poor','ok','great'] %}
+          <label class="chip {{ 'active' if (log.sleep_quality or 'ok') == q }}" style="cursor:pointer; text-transform:capitalize;">
+            <input type="radio" name="quality" value="{{ q }}" {{ 'checked' if (log.sleep_quality or 'ok') == q }} style="display:none;" onchange="document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active')); this.parentElement.classList.add('active')">{{ q }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb16">
+      <div class="section-title">Today's energy</div>
+      <div style="display:flex; gap:10px;">
+        {% for n in range(1,6) %}
+        <label class="ob-opt {{ 'sel' if (log.energy_level or 3) == n }}" style="flex:1; text-align:center; cursor:pointer;">
+          <input type="radio" name="energy" value="{{ n }}" {{ 'checked' if (log.energy_level or 3) == n }} style="display:none;" onchange="document.querySelectorAll('[name=energy]').forEach(r=>r.parentElement.classList.remove('sel')); this.parentElement.classList.add('sel')">
+          {{ ['Exhausted','Low','OK','Good','Energised'][n-1] }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Save today's log</button>
+  </form>
+</div>
+
+<script>
+const goal = {{ water_goal }};
+let water = {{ log.water_glasses or 0 }};
+function renderCups() {
+  const total = Math.max(goal, water);
+  let html = "";
+  for (let i = 0; i < total; i++) html += `<button type="button" class="cup ${i < water ? 'filled' : ''}" onclick="setWater(${i+1})">◍</button>`;
+  document.getElementById("cups").innerHTML = html;
+  document.getElementById("water-val").value = water;
+  document.getElementById("water-count").textContent = water;
+}
+function setWater(n) { water = (n === water) ? n - 1 : n; renderCups(); }
+renderCups();
+</script>
+{% endblock %}

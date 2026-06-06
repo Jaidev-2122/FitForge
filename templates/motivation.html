@@ -1,0 +1,73 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Motivation</div>
+    <div class="page-sub">A push when you need it, and your AI trainer to ask anything</div>
+  </div>
+
+  <div class="ai-panel mb16">
+    <div class="ai-head"><div class="ai-dot"></div><div class="ai-title">Today's push</div></div>
+    <div class="ai-text" id="motiv" style="font-size:15px; line-height:1.8;">Tap below for a fresh hit of motivation.</div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:12px;" onclick="getMotivation()">★ Motivate me</button>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Ask your AI trainer</div>
+    <div id="chat" style="display:flex; flex-direction:column; gap:10px; max-height:340px; overflow-y:auto; margin-bottom:12px;">
+      <div class="chat-bubble ai">Hey {{ profile.display_name or 'there' }}! Ask me anything — form, nutrition, motivation, how to tweak your plan, whatever's on your mind.</div>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <input class="input" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')send()">
+      <button class="btn btn-primary" onclick="send()">Send</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.chat-bubble { padding:12px; border-radius:var(--radius); font-size:13px; line-height:1.7; }
+.chat-bubble.ai { background:var(--bg2); color:var(--text1); }
+.chat-bubble.me { background:var(--accent-1-dim); color:var(--text0); margin-left:20%; }
+</style>
+
+<script>
+const ctx = { name:"{{ profile.display_name }}", goal:{{ (profile.onboarding_answers.goal if profile.onboarding_answers else '')|tojson }}, streak:{{ profile.current_streak }}, stage:"{{ profile.calibration_stage }}" };
+const history = [];
+
+async function getMotivation() {
+  const el = document.getElementById("motiv");
+  el.textContent = "Thinking...";
+  try {
+    const res = await fetch("{{ url_for('api_chat') }}", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ context: ctx, messages:[{role:"user", content:"Give me one punchy, personal motivational message to train today. 2-3 sentences."}] }) });
+    const d = await res.json();
+    el.textContent = d.reply || d.error || "Could not load.";
+  } catch(e) { el.textContent = "Could not reach the AI trainer."; }
+}
+
+async function send() {
+  const input = document.getElementById("chat-input");
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = "";
+  const chat = document.getElementById("chat");
+  chat.insertAdjacentHTML("beforeend", `<div class="chat-bubble me"></div>`);
+  chat.lastElementChild.textContent = msg;
+  chat.insertAdjacentHTML("beforeend", `<div class="chat-bubble ai" id="pending">...</div>`);
+  chat.scrollTop = chat.scrollHeight;
+  history.push({role:"user", content:msg});
+  try {
+    const res = await fetch("{{ url_for('api_chat') }}", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ context: ctx, messages: history }) });
+    const d = await res.json();
+    const reply = d.reply || d.error || "Could not respond.";
+    document.getElementById("pending").removeAttribute("id");
+    chat.lastElementChild.textContent = reply;
+    history.push({role:"assistant", content:reply});
+    chat.scrollTop = chat.scrollHeight;
+  } catch(e) {
+    document.getElementById("pending").textContent = "Could not reach AI.";
+  }
+}
+</script>
+{% endblock %}

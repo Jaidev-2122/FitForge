@@ -1,0 +1,85 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Settings</div>
+    <div class="page-sub">Profile and appearance</div>
+  </div>
+
+  <div class="card mb16">
+    <div class="section-title">Profile</div>
+    <div class="grid-4">
+      <div class="field-box"><div class="l">Name</div><div class="v">{{ profile.display_name or '—' }}</div></div>
+      <div class="field-box"><div class="l">Country</div><div class="v">{{ profile.country or '—' }}</div></div>
+      <div class="field-box"><div class="l">Goal</div><div class="v">{{ profile.onboarding_answers.goal or '—' }}</div></div>
+      <div class="field-box"><div class="l">Stage</div><div class="v">{{ profile.calibration_stage }}</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">Appearance — two-colour theme</div>
+    <form method="post" action="{{ url_for('settings_theme') }}">
+      <div class="page-sub" style="margin-bottom:8px;">Presets</div>
+      <div class="swatch-row">
+        {% for c1,c2 in [('#c8f55a','#5599ff'),('#ff9944','#aa55ff'),('#ff55aa','#5dccaa'),('#5599ff','#c8f55a'),('#1d9e75','#ef9f27')] %}
+        <button type="button" class="swatch" style="background:linear-gradient(90deg, {{ c1 }} 50%, {{ c2 }} 50%);" onclick="setPreset('{{ c1 }}','{{ c2 }}')"></button>
+        {% endfor %}
+      </div>
+
+      <div style="display:flex; gap:24px; margin-bottom:20px; flex-wrap:wrap;">
+        <div><div class="page-sub" style="margin-bottom:8px;">Accent 1 (primary)</div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="color" class="color-pick" name="accent1" id="a1" value="{{ profile.theme_accent_1 }}" oninput="preview()">
+            <input class="input" id="a1t" value="{{ profile.theme_accent_1 }}" style="width:90px;" oninput="document.getElementById('a1').value=this.value; preview()">
+          </div>
+        </div>
+        <div><div class="page-sub" style="margin-bottom:8px;">Accent 2 (secondary)</div>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <input type="color" class="color-pick" name="accent2" id="a2" value="{{ profile.theme_accent_2 }}" oninput="preview()">
+            <input class="input" id="a2t" value="{{ profile.theme_accent_2 }}" style="width:90px;" oninput="document.getElementById('a2').value=this.value; preview()">
+          </div>
+        </div>
+      </div>
+
+      <div class="page-sub" style="margin-bottom:8px;">Mode</div>
+      <div style="display:flex; gap:8px; margin-bottom:20px;">
+        {% for mode in ['dark','light'] %}
+        <label class="theme-opt {{ 'active' if profile.theme_mode == mode }}" style="cursor:pointer;">
+          <input type="radio" name="mode" value="{{ mode }}" {{ 'checked' if profile.theme_mode == mode }} style="display:none;" onchange="setMode(this)">{{ mode }}
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="card mb16" style="background:var(--bg2);">
+        <div class="page-sub" style="margin-bottom:10px;">Live preview</div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <div id="pv1" style="padding:8px 16px; border-radius:8px; background:{{ profile.theme_accent_1 }}; color:#111; font-size:13px; font-weight:600;">Primary</div>
+          <div id="pv2" style="padding:8px 16px; border-radius:8px; background:{{ profile.theme_accent_2 }}; color:#111; font-size:13px; font-weight:600;">Secondary</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" type="submit">Save theme</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function preview() {
+  const a1 = document.getElementById("a1").value, a2 = document.getElementById("a2").value;
+  document.getElementById("a1t").value = a1; document.getElementById("a2t").value = a2;
+  document.getElementById("pv1").style.background = a1;
+  document.getElementById("pv2").style.background = a2;
+  document.documentElement.style.setProperty("--accent-1", a1);
+  document.documentElement.style.setProperty("--accent-2", a2);
+}
+function setPreset(c1, c2) {
+  document.getElementById("a1").value = c1; document.getElementById("a2").value = c2;
+  preview();
+}
+function setMode(r) {
+  document.querySelectorAll(".theme-opt").forEach(t => t.classList.remove("active"));
+  r.parentElement.classList.add("active");
+  document.documentElement.setAttribute("data-theme", r.value);
+}
+</script>
+{% endblock %}

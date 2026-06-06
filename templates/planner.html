@@ -1,0 +1,67 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Weekly Planner</div>
+    <div class="page-sub">Routine v{{ routine.version if routine else 1 }} · AI-built</div>
+  </div>
+
+  {% if routine and routine.ai_summary %}
+  <div class="ai-panel mb16">
+    <div class="ai-title" style="margin-bottom:6px;">Plan overview</div>
+    <div class="ai-text">{{ routine.ai_summary }}</div>
+  </div>
+  {% endif %}
+
+  {% set pct = ((profile.total_exp / profile.exp_to_next * 100) if profile.exp_to_next else 0) %}
+  {% set can_evolve = profile.total_exp >= profile.exp_to_next %}
+  <div class="card mb16">
+    <div class="section-title">
+      Routine evolution
+      <button class="btn btn-primary btn-sm" id="evolve-btn" {{ 'disabled' if not can_evolve }} onclick="evolve()">
+        {{ '✨ Evolve my routine' if can_evolve else 'Keep training to unlock' }}
+      </button>
+    </div>
+    <div class="bar" style="margin-bottom:6px;"><div class="bar-fill" style="width:{{ pct|round(0,'floor') }}%"></div></div>
+    <div class="page-sub">{{ profile.total_exp }} / {{ profile.exp_to_next }} EXP {{ '· ready to evolve' if can_evolve else 'until next evolution' }}</div>
+    <div id="evolve-result" style="margin-top:12px; display:none;"></div>
+  </div>
+
+  {% for d in days %}
+  <div class="card" style="display:flex; align-items:center; gap:14px; padding:14px 18px; margin-bottom:10px; {{ 'opacity:.6;' if d.is_rest }}">
+    <div style="width:48px; font-size:11px; color:var(--text2); text-transform:uppercase;">{{ d.name[:3] }}</div>
+    <div style="width:3px; height:40px; border-radius:2px; background:{{ 'var(--bg3)' if d.is_rest else 'var(--accent-1)' }};"></div>
+    <div style="flex:1;">
+      <div style="font-size:14px; font-weight:600;">{{ d.label }}</div>
+      <div class="page-sub" style="margin-top:2px;">
+        {% if d.is_rest %}Recovery day{% else %}{{ d.exercises|join(', ') if d.exercises else 'No exercises' }} · {{ d.duration }} min{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+async function evolve() {
+  const btn = document.getElementById("evolve-btn");
+  const out = document.getElementById("evolve-result");
+  btn.disabled = true; btn.textContent = "AI analysing...";
+  try {
+    const res = await fetch("{{ url_for('planner_evolve') }}", { method:"POST" });
+    const d = await res.json();
+    out.style.display = "block";
+    if (d.evolved) {
+      out.innerHTML = `<div style="padding:12px; border-radius:var(--radius); background:var(--accent-1-dim); border:1px solid var(--accent-1); font-size:13px; line-height:1.6;">Evolved to v${d.version}! ${d.reason||""}</div>`;
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      out.innerHTML = `<div style="padding:12px; border-radius:var(--radius); background:var(--bg2); border:1px solid var(--border); font-size:13px;">${d.reason || d.error || "Could not evolve."}</div>`;
+      btn.textContent = "✨ Evolve my routine"; btn.disabled = false;
+    }
+  } catch(e) {
+    out.style.display = "block";
+    out.innerHTML = `<div style="padding:12px; font-size:13px; color:var(--red);">Error: ${e.message}</div>`;
+    btn.disabled = false; btn.textContent = "✨ Evolve my routine";
+  }
+}
+</script>
+{% endblock %}

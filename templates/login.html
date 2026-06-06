@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div style="text-align:center; margin-bottom:28px;">
+      <div style="font-size:34px; font-weight:700; color:var(--accent-1); letter-spacing:-1px;">FitForge</div>
+      <div style="font-size:13px; color:var(--text2); margin-top:4px;">Your AI fitness companion that evolves with you</div>
+    </div>
+
+    <!-- login vs signup -->
+    <div class="auth-tabs">
+      <button class="auth-tab {{ 'active' if mode == 'login' }}" onclick="location.href='{{ url_for('login') }}'">Log in</button>
+      <button class="auth-tab {{ 'active' if mode == 'signup' }}" onclick="location.href='{{ url_for('signup') }}'">Sign up</button>
+    </div>
+
+    {% if mode == 'login' %}
+      <form method="post" action="{{ url_for('login') }}">
+        <input class="auth-input" name="identifier" placeholder="Email or username" required autofocus>
+        <input class="auth-input" name="credential" type="password" placeholder="Password or PIN" required>
+        <button class="btn btn-primary" style="width:100%; justify-content:center; padding:11px;" type="submit">Log in</button>
+      </form>
+      <div style="text-align:center; margin-top:14px; font-size:12px; color:var(--text2);">
+        New here? <a href="{{ url_for('signup') }}">Create an account</a>
+      </div>
+
+    {% else %}
+      <!-- method switch -->
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <button type="button" class="method-tab active" data-m="email" onclick="setMethod('email')">Email</button>
+        <button type="button" class="method-tab" data-m="pin" onclick="setMethod('pin')">Username + PIN</button>
+      </div>
+
+      <!-- email signup -->
+      <form method="post" action="{{ url_for('signup') }}" id="form-email">
+        <input type="hidden" name="method" value="email">
+        <input class="auth-input" name="email" type="email" placeholder="Email" required>
+        <input class="auth-input" name="password" type="password" placeholder="Password (min 8 characters)" minlength="8" required>
+        <button class="btn btn-primary" style="width:100%; justify-content:center; padding:11px;" type="submit">Create account</button>
+      </form>
+
+      <!-- pin signup -->
+      <form method="post" action="{{ url_for('signup') }}" id="form-pin" style="display:none;">
+        <input type="hidden" name="method" value="pin">
+        <input class="auth-input" name="username" placeholder="Username (3-20 characters)" pattern="[A-Za-z0-9_]{3,20}" required>
+        <input class="auth-input" name="pin" type="password" inputmode="numeric" placeholder="4-digit PIN" pattern="\d{4}" maxlength="4" required>
+        <button class="btn btn-primary" style="width:100%; justify-content:center; padding:11px;" type="submit">Create account</button>
+        <div style="font-size:11px; color:var(--text2); margin-top:10px; line-height:1.5;">
+          A 4-digit PIN is easy to remember. For your security, an account locks for 15 minutes after 5 wrong tries.
+        </div>
+      </form>
+
+      <div style="text-align:center; margin-top:14px; font-size:12px; color:var(--text2);">
+        Already have an account? <a href="{{ url_for('login') }}">Log in</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+  .method-tab { flex:1; padding:8px; border-radius:var(--radius); border:1px solid var(--border);
+    background:transparent; color:var(--text1); font-size:13px; }
+  .method-tab.active { border-color:var(--accent-1); color:var(--accent-1); background:var(--accent-1-dim); }
+</style>
+
+<script>
+function setMethod(m) {
+  document.querySelectorAll(".method-tab").forEach(t => t.classList.toggle("active", t.dataset.m === m));
+  document.getElementById("form-email").style.display = m === "email" ? "block" : "none";
+  document.getElementById("form-pin").style.display = m === "pin" ? "block" : "none";
+}
+</script>
+{% endblock %}

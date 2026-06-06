@@ -1,0 +1,76 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Welcome back, {{ profile.display_name or 'athlete' }}</div>
+    <div class="page-sub">Routine v{{ routine.version if routine else 1 }} · {{ profile.calibration_stage }} stage</div>
+  </div>
+
+  <div class="grid-4 mb20">
+    <div class="card"><div class="stat-label">Streak</div><div class="stat-val green">{{ profile.current_streak }}</div><div class="stat-sub">days</div></div>
+    <div class="card"><div class="stat-label">This Week</div><div class="stat-val">{{ completed_week }}</div><div class="stat-sub">workouts done</div></div>
+    <div class="card"><div class="stat-label">Total EXP</div><div class="stat-val">{{ profile.total_exp }}</div><div class="stat-sub">/ {{ profile.exp_to_next }} to evolve</div></div>
+    <div class="card"><div class="stat-label">Longest Streak</div><div class="stat-val">{{ profile.longest_streak }}</div><div class="stat-sub">days</div></div>
+  </div>
+
+  <!-- Proactive coach: auto-loads a pattern insight from your real data -->
+  <div class="ai-panel mb20">
+    <div class="ai-head"><div class="ai-dot"></div><div class="ai-title">Coach's read on your week</div></div>
+    <div class="ai-text" id="coach-insight">Reading your last 7 days...</div>
+    <button class="btn btn-ghost btn-sm" style="margin-top:12px;" onclick="loadInsight()">↻ Refresh</button>
+  </div>
+
+  <!-- Quick log strip -->
+  <div class="grid-3 mb20">
+    <a href="{{ url_for('workout') }}" class="card" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:22px; color:var(--accent-1);">▶</span>
+      <div><div style="font-size:13px; font-weight:600; color:var(--text0);">Today's workout</div><div class="page-sub">{{ today_day.label if today_day else 'Rest day' }}</div></div>
+    </a>
+    <a href="{{ url_for('lifestyle') }}" class="card" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:22px; color:var(--accent-2);">♥</span>
+      <div><div style="font-size:13px; font-weight:600; color:var(--text0);">Log water & sleep</div><div class="page-sub">Daily recovery</div></div>
+    </a>
+    <a href="{{ url_for('diet') }}" class="card" style="text-decoration:none; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:22px; color:#ff9944;">◍</span>
+      <div><div style="font-size:13px; font-weight:600; color:var(--text0);">Log a meal</div><div class="page-sub">Track macros</div></div>
+    </a>
+  </div>
+
+  <div class="card mb20">
+    <div class="section-title">This week</div>
+    <div class="week">
+      {% for d in week %}
+      <div class="week-day {{ 'today' if d.is_today }} {{ 'rest' if d.is_rest }}">
+        <div class="wd-label">{{ d.name }}</div>
+        <div class="wd-title">{{ d.label }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">
+      Today: {{ today_day.label if today_day else 'Rest' }}
+      {% if today_day and not today_day.is_rest %}<a href="{{ url_for('workout') }}">Start →</a>{% endif %}
+    </div>
+    <div class="ai-text">
+      {% if today_day and not today_day.is_rest %}Head to today's workout to log your sets and earn EXP.
+      {% else %}Rest day — recover well. Log your sleep and water in Lifestyle.{% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadInsight() {
+  const el = document.getElementById("coach-insight");
+  el.textContent = "Reading your last 7 days...";
+  try {
+    const res = await fetch("{{ url_for('api_analysis') }}", { method:"POST" });
+    const d = await res.json();
+    el.textContent = d.analysis || d.error || "Not enough data yet — log a few days and I'll spot the patterns.";
+  } catch(e) { el.textContent = "Could not reach your coach right now."; }
+}
+// Auto-load once on page open
+loadInsight();
+</script>
+{% endblock %}

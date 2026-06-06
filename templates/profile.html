@@ -1,0 +1,86 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Profile</div>
+    <div class="page-sub">Who you are and how far you've come</div>
+  </div>
+
+  <!-- Identity card -->
+  <div class="card mb16" style="display:flex; align-items:center; gap:16px;">
+    <div class="avatar" style="width:64px; height:64px; font-size:24px;">{{ (profile.display_name or 'U')[:2]|upper }}</div>
+    <div style="flex:1;">
+      <div style="font-size:20px; font-weight:700;">{{ profile.display_name or 'You' }}</div>
+      <div class="page-sub" style="margin-top:2px;">
+        {{ ans.goal or 'Fitness' }} · {{ profile.calibration_stage|capitalize }} stage · {{ ans.country or '' }}
+      </div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:26px; font-weight:700; color:var(--accent-1);">{{ stats.total_exp }}</div>
+      <div class="page-sub">total EXP</div>
+    </div>
+  </div>
+
+  <!-- Key stats -->
+  <div class="grid-4 mb16">
+    <div class="card"><div class="stat-label">Workouts</div><div class="stat-val">{{ stats.total_workouts }}</div><div class="stat-sub">completed</div></div>
+    <div class="card"><div class="stat-label">Current streak</div><div class="stat-val green">{{ stats.streak }}</div><div class="stat-sub">days</div></div>
+    <div class="card"><div class="stat-label">Best streak</div><div class="stat-val">{{ stats.longest }}</div><div class="stat-sub">days</div></div>
+    <div class="card"><div class="stat-label">Routine version</div><div class="stat-val">v{{ stats.routine_versions }}</div><div class="stat-sub">evolutions</div></div>
+  </div>
+
+  {% if stats.start_weight and stats.latest_weight %}
+  <div class="card mb16">
+    <div class="section-title">Body progress</div>
+    <div style="display:flex; align-items:baseline; gap:12px;">
+      <span class="page-sub">Start {{ stats.start_weight }}kg</span>
+      <span style="font-size:20px;">→</span>
+      <span style="font-size:20px; font-weight:700;">{{ stats.latest_weight }}kg</span>
+      {% if stats.weight_delta is not none %}
+        <span class="badge {{ 'badge-compound' if stats.weight_delta > 0 else '' }}"
+              style="{% if stats.weight_delta < 0 %}color:var(--accent-1);border-color:var(--accent-1);{% endif %}">
+          {{ '+' if stats.weight_delta > 0 else '' }}{{ stats.weight_delta }}kg
+        </span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Achievements -->
+  <div class="card mb16">
+    <div class="section-title">Achievements</div>
+    <div class="lib-grid">
+      {% for a in achievements %}
+      <div style="padding:14px; border-radius:var(--radius); border:1px solid var(--border);
+                  background:{{ 'var(--accent-1-dim)' if a.earned else 'var(--bg2)' }};
+                  opacity:{{ '1' if a.earned else '0.45' }};">
+        <div style="font-size:22px; color:{{ 'var(--accent-1)' if a.earned else 'var(--text2)' }};">{{ a.icon }}</div>
+        <div style="font-size:13px; font-weight:600; margin-top:6px;">{{ a.name }}</div>
+        <div class="page-sub" style="margin-top:2px;">{{ a.desc }}</div>
+        {% if a.earned %}<div style="font-size:10px; color:var(--accent-1); margin-top:6px; text-transform:uppercase; letter-spacing:1px;">Unlocked</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Routine history -->
+  <div class="card">
+    <div class="section-title">Routine history</div>
+    {% if not routines %}
+      <div class="page-sub">No routines yet.</div>
+    {% else %}
+      {% for r in routines %}
+      <div style="padding:12px 0; border-bottom:1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <span style="font-size:13px; font-weight:600;">Version {{ r.version }}</span>
+          <span class="page-sub">{{ r.created_at[:10] }}</span>
+        </div>
+        <div class="page-sub" style="margin-top:4px; line-height:1.6;">
+          {{ r.evolution_reason or r.ai_summary or '' }}
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">{{ day.label if day else 'Rest Day' }}</div>
+    <div class="page-sub">
+      {% if day and not day.is_rest %}{{ exercises|length }} exercises · ~{{ day.est_duration_min }} min
+      {% else %}Recovery day — no workout scheduled{% endif %}
+    </div>
+  </div>
+
+  {% if not day or day.is_rest %}
+    <div class="ai-text">Nothing scheduled today. Rest up and log your recovery in Lifestyle.</div>
+  {% else %}
+    {% for de in exercises %}
+    {% set ex = de.exercise %}
+    {% set is_done = de.id in done_ids %}
+    <div class="ex-row {{ 'done' if is_done }}">
+      <div class="ex-check">{{ '✓' if is_done }}</div>
+      <div style="flex:1;">
+        <div class="ex-name">{{ ex.name }}</div>
+        <div class="ex-detail">{{ de.target_sets }} × {{ de.target_reps }}{% if de.target_weight_kg %} · {{ de.target_weight_kg }}kg{% endif %}</div>
+      </div>
+      {% if ex.is_compound %}<span class="badge badge-compound">Compound</span>{% endif %}
+      <button class="btn btn-ghost btn-sm" onclick='openEx({{ de|tojson }})'>{{ 'View' if is_done else 'Log' }}</button>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
+<!-- modal -->
+<div class="modal-overlay" id="ex-modal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="m-name"></div>
+      <button class="close-btn" onclick="document.getElementById('ex-modal').classList.remove('open')">✕</button>
+    </div>
+    <div style="font-size:12px; color:var(--accent-1); margin-bottom:12px;" id="m-muscle"></div>
+
+    <form method="post" action="{{ url_for('workout_log') }}">
+      <input type="hidden" name="day_exercise_id" id="m-de-id">
+      <div class="set-grid">
+        <div class="set-box"><label>Sets</label><input type="number" name="sets" id="m-sets"></div>
+        <div class="set-box"><label>Reps</label><input type="number" name="reps" id="m-reps"></div>
+        <div class="set-box"><label>Weight</label><input type="number" step="0.5" name="weight" id="m-weight"></div>
+      </div>
+
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">How to perform</div>
+      <div class="steps" id="m-steps"></div>
+
+      <div class="hint-box">
+        <div class="hint-title">Form tip</div>
+        <div class="hint-text" id="m-tip"></div>
+      </div>
+
+      <button class="btn btn-primary" style="width:100%; justify-content:center; margin-top:16px;" type="submit">✓ Log set</button>
+    </form>
+  </div>
+</div>
+
+<script>
+const TIPS = {{ tips|tojson }};
+const DEFAULT_TIPS = ["Control the lowering phase — that's where growth happens.","Breathe out on the effort.","If form breaks down, lower the weight."];
+function openEx(de) {
+  const ex = de.exercise;
+  document.getElementById("m-name").textContent = ex.name;
+  document.getElementById("m-muscle").textContent = (ex.muscles_primary||[]).join(" · ");
+  document.getElementById("m-de-id").value = de.id;
+  document.getElementById("m-sets").value = de.target_sets;
+  document.getElementById("m-reps").value = de.target_reps;
+  document.getElementById("m-weight").value = de.target_weight_kg || 0;
+  document.getElementById("m-steps").innerHTML = (ex.steps||[]).map((s,i) =>
+    `<div class="step"><div class="step-num">${i+1}</div><div class="step-text">${s}</div></div>`).join("");
+  const tips = TIPS[ex.name] || DEFAULT_TIPS;
+  document.getElementById("m-tip").textContent = tips[Math.floor(Math.random()*tips.length)];
+  document.getElementById("ex-modal").classList.add("open");
+}
+</script>
+{% endblock %}
