@@ -37,21 +37,44 @@
 
 <script>
 const QUESTIONS = [
+  // ---- Tier 1: the basics ----
   {key:"age", q:"How old are you?", type:"number", tier:1},
-  {key:"biological_sex", q:"Biological sex? (affects training response)", type:"choice", options:["male","female","other"], tier:1},
+  {key:"biological_sex", q:"Biological sex? (it affects how you respond to training and recovery)", type:"choice", options:["male","female","other"], tier:1},
   {key:"height_cm", q:"Your height in cm?", type:"number", tier:1},
   {key:"weight_kg", q:"Current weight in kg?", type:"number", tier:1},
-  {key:"country", q:"Which country are you in? (for local food ideas)", type:"text", tier:1},
-  {key:"equipment", q:"What equipment can you use?", type:"choice", options:["Full gym","Home + dumbbells","Bodyweight only","Mix of home + gym"], tier:1},
-  {key:"injuries", q:"Any injuries or limitations to work around?", type:"text", tier:1, optional:true},
-  {key:"history", q:"Have you trained before?", type:"choice", options:["Never","Used to, stopped","Currently active"], tier:2},
-  {key:"why_stopped", q:"If you stopped before — what got in the way?", type:"text", tier:2, optional:true},
-  {key:"days_per_week", q:"Realistically, how many days a week can you train?", type:"choice", options:["2","3","4","5","6"], tier:2},
-  {key:"session_length", q:"How long per session?", type:"choice", options:["30 min","45 min","60 min","90 min"], tier:2},
-  {key:"goal", q:"Main goal right now?", type:"choice", options:["Lose fat / tone","Build muscle","Both","General fitness"], tier:2},
-  {key:"energy", q:"Day-to-day energy level?", type:"choice", options:["Low","Average","High"], tier:2},
-  {key:"sleep", q:"Hours of sleep on a typical night?", type:"number", tier:2},
+  {key:"target_weight_kg", q:"Is there a weight you're aiming for? (cm/kg — leave blank if unsure)", type:"text", tier:1, optional:true},
+  {key:"country", q:"Which country are you in? (so food suggestions are local and cheap)", type:"text", tier:1},
+  {key:"body_type", q:"How would you describe your current build?", type:"choice", options:["Lean / slim","Average","Carrying some extra weight","Larger / heavier","Muscular already"], tier:1},
+
+  // ---- Tier 2: training background ----
+  {key:"history", q:"What's your training history?", type:"choice", options:["Total beginner","Trained a bit before","Trained seriously, took a break","Currently training"], tier:2},
+  {key:"why_stopped", q:"If you've stopped training before, what actually got in the way? (be honest — boredom, time, injury, motivation?)", type:"text", tier:2, optional:true},
+  {key:"experience_lifts", q:"How comfortable are you with weights like squats, deadlifts and presses?", type:"choice", options:["Never done them","Done them, unsure on form","Comfortable","Very experienced"], tier:2},
+  {key:"goal", q:"What's the main outcome you want?", type:"choice", options:["Lose fat / get leaner","Build muscle / get bigger","Get stronger","Tone up & stay healthy","Improve endurance / fitness"], tier:2},
+  {key:"goal_why", q:"What's the real reason behind that goal? (an event, confidence, health, energy — this helps me keep you motivated)", type:"text", tier:2, optional:true},
+  {key:"target_areas", q:"Any body areas you most want to focus on?", type:"choice", options:["Whole body evenly","Upper body","Lower body / glutes & legs","Core / midsection","Posture & back"], tier:2},
+  {key:"days_per_week", q:"Realistically — not ideally — how many days a week will you train?", type:"choice", options:["2","3","4","5","6"], tier:2},
+  {key:"session_length", q:"How long can a typical session actually be?", type:"choice", options:["20-30 min","30-45 min","45-60 min","60-90 min"], tier:2},
+  {key:"equipment", q:"What do you have access to?", type:"choice", options:["Full gym","Home with dumbbells/bands","Bodyweight only","Mix of home + gym"], tier:2},
+  {key:"preferred_style", q:"What kind of training appeals to you most?", type:"choice", options:["Lifting weights","Bodyweight / calisthenics","Circuits / HIIT","A mix of everything","Not sure yet"], tier:2},
+  {key:"enjoyed_before", q:"Any exercise or activity you've genuinely enjoyed before? (sport, dance, running, anything)", type:"text", tier:2, optional:true},
+  {key:"disliked", q:"Anything you really dislike or want to avoid in workouts?", type:"text", tier:2, optional:true},
+
+  // ---- Tier 3: body, recovery, lifestyle ----
+  {key:"injuries", q:"Any injuries, pain points, or movements you should avoid? (knees, back, shoulders…)", type:"text", tier:3, optional:true},
+  {key:"medical", q:"Any health conditions I should train around? (heart, blood pressure, asthma — leave blank if none)", type:"text", tier:3, optional:true},
+  {key:"activity_level", q:"Outside workouts, how active is your day?", type:"choice", options:["Mostly sitting","Lightly active","On my feet a lot","Physically demanding job"], tier:3},
+  {key:"energy", q:"How are your energy levels through a normal day?", type:"choice", options:["Low / often tired","Up and down","Generally good","High"], tier:3},
+  {key:"sleep", q:"How many hours do you usually sleep?", type:"number", tier:3},
+  {key:"stress", q:"How would you rate your daily stress?", type:"choice", options:["Low","Moderate","High","Very high"], tier:3},
+  {key:"diet_now", q:"How would you honestly describe how you eat right now?", type:"choice", options:["Pretty clean","Average / mixed","Lots of takeaway & snacks","All over the place"], tier:3},
+  {key:"diet_restrictions", q:"Any dietary restrictions or preferences? (vegetarian, vegan, halal, allergies…)", type:"text", tier:3, optional:true},
+  {key:"water_now", q:"Roughly how much water do you drink daily?", type:"choice", options:["Barely any","A few glasses","Around 1-2 litres","2 litres or more"], tier:3},
+  {key:"motivation_style", q:"What keeps you going best?", type:"choice", options:["Tough love / push me hard","Encouragement & positivity","Data & progress numbers","Streaks & gamification"], tier:3},
+  {key:"biggest_obstacle", q:"Last one — what's the single biggest thing that usually stops you sticking to a routine?", type:"text", tier:3, optional:true},
 ];
+
+const TIER_LABELS = {1:"The basics", 2:"Your training", 3:"Body & lifestyle"};
 
 let step = 0;
 const answers = {};
@@ -68,7 +91,7 @@ function startQuiz() {
 function render() {
   const q = QUESTIONS[step];
   document.getElementById("progress").innerHTML = QUESTIONS.map((_, i) => `<div class="${i <= step ? 'on' : ''}"></div>`).join("");
-  document.getElementById("tier").textContent = q.tier === 1 ? "The basics" : "About your training";
+  document.getElementById("tier").textContent = TIER_LABELS[q.tier] || "About you";
   document.getElementById("question").textContent = q.q;
   document.getElementById("back-btn").style.visibility = step === 0 ? "hidden" : "visible";
   const area = document.getElementById("answer-area");

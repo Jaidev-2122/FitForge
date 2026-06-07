@@ -37,6 +37,23 @@
   {% block head %}{% endblock %}
 </head>
 <body>
+  {# ---- Background: animated dust waves by default, or user's custom image/preset ---- #}
+  {% set bgt = shell.bg_type if shell and shell.bg_type else 'waves' %}
+  {% if bgt == 'image' and shell and shell.bg_value %}
+    <div class="bg-image" style="background-image:url('{{ shell.bg_value }}')"></div>
+  {% elif bgt == 'preset' and shell and shell.bg_value %}
+    <div class="bg-preset bg-preset-{{ shell.bg_value }}"></div>
+  {% elif bgt == 'none' %}
+    {# plain background, no animation #}
+  {% else %}
+    <div class="bg-layer">
+      <div class="wave w1"></div>
+      <div class="wave w2"></div>
+      <div class="wave w3"></div>
+      <div class="dust"></div>
+    </div>
+  {% endif %}
+
   {% with messages = get_flashed_messages() %}
     {% if messages %}
       <div class="flash">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>

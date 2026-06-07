@@ -55,6 +55,17 @@
 
       <button class="btn btn-primary" style="width:100%; justify-content:center; margin-top:16px;" type="submit">✓ Log set</button>
     </form>
+
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Rest timer</div>
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="startTimer(60)">60s</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="startTimer(90)">90s</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="startTimer(120)">2 min</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="stopTimer()">Stop</button>
+        <span id="timer-display" style="font-size:22px; font-weight:700; color:var(--accent-1); margin-left:auto;"></span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -77,3 +88,23 @@ function openEx(de) {
 }
 </script>
 {% endblock %}
+<script>
+let _timer = null;
+function startTimer(seconds) {
+  clearInterval(_timer);
+  const el = document.getElementById("timer-display");
+  let remaining = seconds;
+  el.textContent = remaining + "s";
+  _timer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(_timer);
+      el.textContent = "Go!";
+      if (navigator.vibrate) navigator.vibrate([200,100,200]);
+    } else {
+      el.textContent = remaining + "s";
+    }
+  }, 1000);
+}
+function stopTimer() { clearInterval(_timer); document.getElementById("timer-display").textContent = ""; }
+</script>

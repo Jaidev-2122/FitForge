@@ -82,4 +82,77 @@ function setMode(r) {
   document.documentElement.setAttribute("data-theme", r.value);
 }
 </script>
+
+<div class="card" style="margin-top:16px;">
+  <div class="section-title">Portal background</div>
+  <p class="page-sub" style="margin-bottom:14px;">Choose what shows behind your app. Animated dust waves are the default.</p>
+  <form method="post" action="{{ url_for('settings_background') }}">
+    {% set cur = profile.bg_type or 'waves' %}
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+      <label class="bg-opt {{ 'active' if cur == 'waves' }}"><input type="radio" name="bg_type" value="waves" {{ 'checked' if cur=='waves' }} onchange="bgMode('waves')" hidden>✦ Dust waves</label>
+      <label class="bg-opt {{ 'active' if cur == 'preset' }}"><input type="radio" name="bg_type" value="preset" {{ 'checked' if cur=='preset' }} onchange="bgMode('preset')" hidden>◇ Preset wallpaper</label>
+      <label class="bg-opt {{ 'active' if cur == 'image' }}"><input type="radio" name="bg_type" value="image" {{ 'checked' if cur=='image' }} onchange="bgMode('image')" hidden>▣ Custom image URL</label>
+      <label class="bg-opt {{ 'active' if cur == 'none' }}"><input type="radio" name="bg_type" value="none" {{ 'checked' if cur=='none' }} onchange="bgMode('none')" hidden>○ Plain</label>
+    </div>
+
+    <div id="bg-preset" style="{{ '' if cur=='preset' else 'display:none;' }} margin-bottom:14px;">
+      <div class="page-sub" style="margin-bottom:8px;">Pick a wallpaper</div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        {% for p in presets %}
+        <label class="preset-swatch bg-preset-{{ p }} {{ 'active' if profile.bg_value == p }}" style="position:relative; overflow:hidden; min-width:90px; height:54px; display:flex; align-items:flex-end;">
+          <input type="radio" name="bg_value" value="{{ p }}" {{ 'checked' if profile.bg_value == p }} hidden onchange="pickPreset(this)">
+          <span style="position:relative; z-index:1; text-transform:capitalize; background:rgba(0,0,0,0.45); color:#fff; padding:2px 8px; border-radius:6px; margin:6px;">{{ p }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div id="bg-image" style="{{ '' if cur=='image' else 'display:none;' }} margin-bottom:14px;">
+      <div class="page-sub" style="margin-bottom:8px;">Paste an image URL (https://…)</div>
+      <input class="input" name="bg_value_url" id="bg-url"
+             value="{{ profile.bg_value if cur=='image' else '' }}"
+             placeholder="https://images.example.com/my-photo.jpg">
+    </div>
+
+    <button class="btn btn-primary" type="submit" onclick="syncBgValue()">Save background</button>
+  </form>
+</div>
+
+<style>
+  .bg-opt { padding:8px 14px; border-radius:var(--radius); border:1px solid var(--border);
+    background:transparent; color:var(--text1); font-size:13px; cursor:pointer; }
+  .bg-opt.active { border-color:var(--accent-1); color:var(--accent-1); background:var(--accent-1-dim); }
+  .preset-swatch { padding:14px 18px; border-radius:var(--radius); border:1px solid var(--border);
+    cursor:pointer; font-size:12px; color:var(--text1); background:var(--bg2); }
+  .preset-swatch.active { border-color:var(--accent-1); color:var(--accent-1); }
+</style>
+
+<script>
+function bgMode(m) {
+  document.querySelectorAll(".bg-opt").forEach(o => {
+    o.classList.toggle("active", o.querySelector("input").value === m);
+  });
+  document.getElementById("bg-preset").style.display = (m === "preset") ? "block" : "none";
+  document.getElementById("bg-image").style.display = (m === "image") ? "block" : "none";
+}
+function pickPreset(input) {
+  document.querySelectorAll(".preset-swatch").forEach(s => s.classList.remove("active"));
+  input.parentElement.classList.add("active");
+}
+// When using a custom URL, copy it into the bg_value field the server reads.
+function syncBgValue() {
+  const mode = document.querySelector('input[name="bg_type"]:checked').value;
+  if (mode === "image") {
+    const url = document.getElementById("bg-url").value;
+    // inject a hidden bg_value so the server gets it under the expected name
+    let hidden = document.getElementById("hidden-bg-value");
+    if (!hidden) {
+      hidden = document.createElement("input");
+      hidden.type = "hidden"; hidden.name = "bg_value"; hidden.id = "hidden-bg-value";
+      document.getElementById("bg-image").appendChild(hidden);
+    }
+    hidden.value = url;
+  }
+}
+</script>
 {% endblock %}

@@ -25,12 +25,35 @@ from lib import auth
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-change-me")
+_secret = os.environ.get("FLASK_SECRET_KEY")
+if not _secret:
+    if os.environ.get("FITFORGE_ALLOW_DEV_SECRET") == "1":
+        _secret = "dev-only-insecure-key"  # local development only
+    else:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY is not set. Add it to your environment variables "
+            "(or set FITFORGE_ALLOW_DEV_SECRET=1 for local development only).")
+app.secret_key = _secret
 
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-KNOWN_EXERCISES = ("Barbell Row, Pull-ups, Bench Press, Barbell Squat, Romanian Deadlift, "
-                   "Lateral Raise, Dumbbell Curl, Push-ups, Plank, Goblet Squat, "
-                   "Overhead Press, Walking Lunges, Seated Cable Row, Mountain Climbers, Jumping Jacks")
+
+
+def known_exercises_text():
+    """Build the exercise list for AI prompts from the live database, grouped
+    by category so the AI picks sensible, varied movements. Falls back to a
+    minimal set if the DB read fails."""
+    try:
+        rows = db().table("exercises").select("name,category,equipment").order("category").execute().data
+        by_cat = {}
+        for r in rows:
+            by_cat.setdefault(r.get("category") or "Other", []).append(
+                f"{r['name']} ({r.get('equipment') or 'any'})")
+        lines = [f"{cat}: {', '.join(names)}" for cat, names in by_cat.items()]
+        return "\n".join(lines)
+    except Exception:
+        return ("Chest: Bench Press, Push-ups | Back: Barbell Row, Pull-ups | "
+                "Thighs: Barbell Squat | Glutes: Romanian Deadlift | "
+                "Shoulders: Overhead Press | Arms: Dumbbell Curl | Core: Plank")
 
 
 # ----------------------------- helpers -----------------------------
@@ -57,6 +80,15 @@ def first_row(query):
     single-row helper which can raise when no row exists."""
     rows = query.execute().data
     return rows[0] if rows else None
+
+
+def _norm_name(name):
+    """Normalize an exercise name for matching: lowercase, drop any
+    parenthetical (e.g. equipment), strip whitespace."""
+    if not name:
+        return ""
+    base = name.split("(")[0]
+    return base.strip().lower()
 
 
 def build_user_context(deep=False):
@@ -109,6 +141,43 @@ def get_profile():
     return first_row(db().table("profiles").select("*").eq("id", uid()))
 
 
+def apply_missed_workout_penalty():
+    """If yesterday was a scheduled (non-rest) workout day and nothing was
+    logged, deduct EXP once. Idempotent: tagged in exp_events so it won't
+    double-charge if the dashboard is opened multiple times."""
+    d = db()
+    profile = get_profile()
+    if not profile:
+        return
+    yesterday = (date.today() - timedelta(days=1))
+    y_iso = yesterday.isoformat()
+    tag = f"missed:{y_iso}"
+
+    # Already penalised for yesterday?
+    existing = d.table("exp_events").select("id").eq("user_id", uid()).eq("reason", tag).execute().data
+    if existing:
+        return
+
+    routine = first_row(d.table("routines").select("id").eq("user_id", uid()).eq("is_active", True))
+    if not routine:
+        return
+    y_day = first_row(d.table("workout_days").select("is_rest")
+                      .eq("routine_id", routine["id"]).eq("day_of_week", yesterday.weekday()))
+    if not y_day or y_day.get("is_rest"):
+        return  # not a scheduled training day
+
+    logged = d.table("workout_logs").select("id").eq("user_id", uid()).eq("logged_date", y_iso).execute().data
+    if logged:
+        return  # they trained, no penalty
+
+    penalty = -30
+    new_total = max(0, (profile.get("total_exp") or 0) + penalty)
+    d.table("exp_events").insert({
+        "user_id": uid(), "delta": penalty, "reason": tag, "running_total": new_total,
+    }).execute()
+    d.table("profiles").update({"total_exp": new_total}).eq("id", uid()).execute()
+
+
 def onboarding_required(f):
     """Require login, then require completed onboarding."""
     @wraps(f)
@@ -120,6 +189,20 @@ def onboarding_required(f):
             return redirect(url_for("welcome"))
         return f(*args, **kwargs)
     return wrapper
+
+
+def rate_limited(bucket, limit, window_seconds=3600):
+    """Simple per-session sliding-window limiter. Returns True if over limit."""
+    import time
+    now = time.time()
+    key = f"rl_{bucket}"
+    hits = [t for t in session.get(key, []) if t > now - window_seconds]
+    if len(hits) >= limit:
+        session[key] = hits
+        return True
+    hits.append(now)
+    session[key] = hits
+    return False
 
 
 @app.context_processor
@@ -203,8 +286,10 @@ def onboarding_complete():
             "Output strict JSON only. Schema: {\"ai_summary\": str, \"exp_gate\": int (800-1500), "
             "\"days\": [{\"day_of_week\": 0-6, \"label\": str, \"is_rest\": bool, \"est_duration_min\": int, "
             "\"exercises\": [{\"name\": str, \"target_sets\": int, \"target_reps\": int, \"target_weight_kg\": number-or-null}]}]}. "
-            f"Use only these exact exercise names: {KNOWN_EXERCISES}. Build exactly 7 day entries (0=Mon..6=Sun), "
-            "with rest days placed sensibly around their training days."
+            "Use ONLY exercises from this categorized library (the name in each entry must match EXACTLY, "
+            "without the equipment in parentheses). Draw from multiple categories for balance:\n"
+            f"{known_exercises_text()}\n"
+            "Build exactly 7 day entries (0=Mon..6=Sun), with rest days placed sensibly around their training days."
         )
         raw = generate(system=system,
                        parts=[{"text": f"Build the week for this person:\n{json.dumps(answers, indent=2)}"}],
@@ -218,7 +303,7 @@ def onboarding_complete():
         d.table("profiles").update({"exp_to_next": routine.get("exp_gate", 1000)}).eq("id", uid()).execute()
 
         ex_rows = d.table("exercises").select("id,name").execute().data
-        ex_map = {e["name"].lower(): e["id"] for e in ex_rows}
+        ex_map = {_norm_name(e["name"]): e["id"] for e in ex_rows}
         for day in routine.get("days", []):
             wd = d.table("workout_days").insert({
                 "routine_id": new_routine["id"], "day_of_week": day["day_of_week"],
@@ -229,7 +314,7 @@ def onboarding_complete():
                 continue
             rows = []
             for i, ex in enumerate(day.get("exercises", [])):
-                ex_id = ex_map.get(ex["name"].lower())
+                ex_id = ex_map.get(_norm_name(ex["name"]))
                 if ex_id:
                     rows.append({"workout_day_id": wd["id"], "exercise_id": ex_id,
                                  "target_sets": ex.get("target_sets", 3), "target_reps": ex.get("target_reps", 10),
@@ -336,6 +421,7 @@ def logout():
 @onboarding_required
 def dashboard():
     d = db()
+    apply_missed_workout_penalty()
     profile = get_profile()
     routine = first_row(d.table("routines").select("id,version,ai_summary")
                         .eq("user_id", uid()).eq("is_active", True))
@@ -392,9 +478,20 @@ def workout_log():
     reps_done = int(request.form.get("reps") or 0)
     weight = float(request.form.get("weight") or 0)
 
-    de = (d.table("day_exercises").select("*, exercise:exercises(is_compound)")
+    de = (d.table("day_exercises").select("*, exercise:exercises(is_compound), workout_day:workout_days(routine_id)")
           .eq("id", de_id).single().execute().data)
     profile = get_profile()
+
+    # Verify this day_exercise belongs to the logged-in user's routine.
+    wd = de.get("workout_day") or {}
+    routine_id = wd.get("routine_id") if isinstance(wd, dict) else (wd[0].get("routine_id") if wd else None)
+    owns = False
+    if routine_id:
+        owner = first_row(d.table("routines").select("id").eq("id", routine_id).eq("user_id", uid()))
+        owns = owner is not None
+    if not owns:
+        return redirect(url_for("workout"))  # silently ignore foreign/forged ids
+
     is_compound = bool((de.get("exercise") or {}).get("is_compound"))
     target_w = de.get("target_weight_kg") or 0
     beat = weight > target_w if target_w else False
@@ -410,7 +507,17 @@ def workout_log():
         streak = 1
     longest = max(profile.get("longest_streak") or 0, streak)
 
+    # Personal record: did they beat their best-ever weight on THIS exercise?
+    prev_best = first_row(d.table("workout_logs").select("weight_used_kg")
+                          .eq("user_id", uid()).eq("day_exercise_id", de_id)
+                          .order("weight_used_kg", desc=True).limit(1))
+    prev_best_w = (prev_best or {}).get("weight_used_kg") or 0
+    is_pr = weight > prev_best_w and weight > 0
+
     delta, reasons = calculate_exp(True, is_compound, sets_done, beat, streak)
+    if is_pr:
+        delta += 50
+        reasons.append(f"New PR: {weight}kg")
     new_total = (profile.get("total_exp") or 0) + delta
 
     d.table("workout_logs").insert({
@@ -424,7 +531,39 @@ def workout_log():
         "total_exp": new_total, "current_streak": streak, "longest_streak": longest,
         "last_workout_date": t.isoformat(),
     }).eq("id", uid()).execute()
+    if is_pr:
+        flash(f"🏆 New personal record: {weight}kg! (+50 EXP)")
     return redirect(url_for("workout"))
+
+
+# ----------------------------- workout history -----------------------------
+@app.route("/history")
+@onboarding_required
+def history():
+    d = db()
+    since = (date.today() - timedelta(days=30)).isoformat()
+    logs = (d.table("workout_logs")
+            .select("logged_date,sets_done,reps_done,weight_used_kg,"
+                    "day_exercise:day_exercises(exercise:exercises(name,category))")
+            .eq("user_id", uid()).gte("logged_date", since)
+            .order("logged_date", desc=True).execute().data)
+    # Group by date, newest first, flattening the nested exercise name.
+    grouped = {}
+    for l in logs:
+        de = l.get("day_exercise") or {}
+        if isinstance(de, list):
+            de = de[0] if de else {}
+        ex = (de or {}).get("exercise") or {}
+        if isinstance(ex, list):
+            ex = ex[0] if ex else {}
+        grouped.setdefault(l["logged_date"], []).append({
+            "name": ex.get("name", "Exercise"),
+            "category": ex.get("category"),
+            "sets": l.get("sets_done"), "reps": l.get("reps_done"),
+            "weight": l.get("weight_used_kg"),
+        })
+    days = [{"date": k, "entries": v} for k, v in grouped.items()]
+    return render_template("history.html", days=days)
 
 
 # ----------------------------- planner + evolution -----------------------------
@@ -475,7 +614,8 @@ def planner_evolve():
         "Output strict JSON only: {\"ai_summary\": str, \"evolution_reason\": str, \"exp_gate\": int (higher than before), "
         "\"days\": [{\"day_of_week\":0-6,\"label\":str,\"is_rest\":bool,\"est_duration_min\":int,"
         "\"exercises\":[{\"name\":str,\"target_sets\":int,\"target_reps\":int,\"target_weight_kg\":number-or-null}]}]}. "
-        f"Use only these names: {KNOWN_EXERCISES}. Build exactly 7 day entries."
+        f"Use ONLY exercises from this categorized library (match the name EXACTLY, without the "
+        f"equipment in parentheses):\n{known_exercises_text()}\nBuild exactly 7 day entries."
     )
     try:
         raw = generate(system=system, parts=[{"text":
@@ -497,7 +637,7 @@ def planner_evolve():
     }).execute().data[0]
 
     ex_rows = d.table("exercises").select("id,name").execute().data
-    ex_map = {e["name"].lower(): e["id"] for e in ex_rows}
+    ex_map = {_norm_name(e["name"]): e["id"] for e in ex_rows}
     for day in evolved.get("days", []):
         wd = d.table("workout_days").insert({
             "routine_id": new_routine["id"], "day_of_week": day["day_of_week"], "label": day["label"],
@@ -507,7 +647,7 @@ def planner_evolve():
             continue
         rows = []
         for i, ex in enumerate(day.get("exercises", [])):
-            ex_id = ex_map.get(ex["name"].lower())
+            ex_id = ex_map.get(_norm_name(ex["name"]))
             if ex_id:
                 rows.append({"workout_day_id": wd["id"], "exercise_id": ex_id,
                              "target_sets": ex.get("target_sets", 3), "target_reps": ex.get("target_reps", 10),
@@ -639,10 +779,19 @@ def diet_delete():
 @app.route("/library")
 @onboarding_required
 def library():
-    rows = db().table("exercises").select("*").order("name").execute().data
+    rows = db().table("exercises").select("*").order("category").order("name").execute().data
     for r in rows:
         r["tips"] = tips_for(r["name"])
-    return render_template("library.html", exercises=rows)
+    # Stable, distinct colour per category (used for badges + filters).
+    cat_colors = {
+        "Chest": "#ff6b6b", "Back": "#4dabf7", "Shoulders": "#ffd43b",
+        "Arms": "#da77f2", "Thighs": "#69db7c", "Glutes": "#ff922b",
+        "Core": "#3bc9db", "Calves": "#a9e34b", "Posture": "#9775fa",
+        "Cardio": "#ff8787", "Other": "#888888",
+    }
+    categories = sorted({r.get("category") for r in rows if r.get("category")})
+    return render_template("library.html", exercises=rows,
+                           categories=categories, cat_colors=cat_colors)
 
 
 # ----------------------------- motivation -----------------------------
@@ -702,7 +851,8 @@ def profile_page():
 @app.route("/settings")
 @onboarding_required
 def settings():
-    return render_template("settings.html", profile=get_profile())
+    return render_template("settings.html", profile=get_profile(),
+                           presets=PRESET_BACKGROUNDS)
 
 
 @app.route("/settings/theme", methods=["POST"])
@@ -716,10 +866,40 @@ def settings_theme():
     return redirect(url_for("settings"))
 
 
+# Built-in animated/preset wallpapers the user can choose.
+PRESET_BACKGROUNDS = ["aurora", "nebula", "mesh", "sunset", "forest", "ocean"]
+
+
+@app.route("/settings/background", methods=["POST"])
+@onboarding_required
+def settings_background():
+    bg_type = request.form.get("bg_type", "waves")
+    bg_value = (request.form.get("bg_value") or request.form.get("bg_value_url") or "").strip()
+
+    # Validate to avoid storing junk / unsafe values.
+    if bg_type == "image":
+        # only allow http(s) image URLs
+        if not (bg_value.startswith("http://") or bg_value.startswith("https://")):
+            flash("Please enter a valid image URL starting with http:// or https://")
+            return redirect(url_for("settings"))
+    elif bg_type == "preset":
+        if bg_value not in PRESET_BACKGROUNDS:
+            bg_value = PRESET_BACKGROUNDS[0]
+    elif bg_type in ("waves", "none"):
+        bg_value = None
+    else:
+        bg_type, bg_value = "waves", None
+
+    db().table("profiles").update({"bg_type": bg_type, "bg_value": bg_value}).eq("id", uid()).execute()
+    return redirect(url_for("settings"))
+
+
 # ----------------------------- AI endpoints -----------------------------
 @app.route("/api/chat", methods=["POST"])
 @onboarding_required
 def api_chat():
+    if rate_limited("chat", 30):
+        return jsonify({"error": "You're sending messages very fast — take a short break and try again."}), 429
     payload = request.get_json(silent=True) or {}
     msgs = payload.get("messages", [])
     # Pull the user's real data server-side so the AI actually knows them.
@@ -747,6 +927,8 @@ def api_chat():
 @onboarding_required
 def api_analysis():
     """AI qualitative analysis of routine adherence, water, and food for today/this week."""
+    if rate_limited("analysis", 15):
+        return jsonify({"error": "Analysis is rate-limited. Try again shortly."}), 429
     d = db()
     profile = get_profile()
     since = (date.today() - timedelta(days=7)).isoformat()
@@ -775,6 +957,20 @@ def api_analysis():
         return jsonify({"analysis": text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ----------------------------- error handlers -----------------------------
+@app.errorhandler(404)
+def not_found(e):
+    return render_template("error.html", code=404,
+                           message="That page doesn't exist."), 404
+
+
+@app.errorhandler(500)
+def server_error(e):
+    app.logger.error(f"500 error: {e}")
+    return render_template("error.html", code=500,
+                           message="Something went wrong on our end."), 500
 
 
 # ----------------------------- PWA static routes -----------------------------

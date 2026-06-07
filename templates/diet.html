@@ -1,4 +1,7 @@
 {% extends "app_base.html" %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
 {% block main %}
 <div class="page">
   <div class="head-wrap">
@@ -17,6 +20,16 @@
     </div>
     {% endfor %}
   </div>
+
+  {% if totals.protein or totals.carbs or totals.fat %}
+  <div class="card mb16" style="display:flex; align-items:center; gap:24px; flex-wrap:wrap;">
+    <div style="width:160px; height:160px;"><canvas id="macroChart"></canvas></div>
+    <div style="flex:1; min-width:160px;">
+      <div class="section-title">Today's macro split</div>
+      <div class="page-sub">By calories: protein {{ (totals.protein*4) }} kcal · carbs {{ (totals.carbs*4) }} kcal · fat {{ (totals.fat*9) }} kcal</div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="card mb16">
     <div class="section-title">Add food</div>
@@ -129,5 +142,36 @@ async function analyse() {
     out.textContent = d.analysis || d.error || "Could not analyse.";
   } catch(e) { out.textContent = "Could not reach AI."; }
 }
+</script>
+
+<script>
+(function() {
+  const el = document.getElementById("macroChart");
+  if (!el || typeof Chart === "undefined") return;
+  const pCal = {{ (totals.protein * 4)|int }};
+  const cCal = {{ (totals.carbs * 4)|int }};
+  const fCal = {{ (totals.fat * 9)|int }};
+  if (pCal + cCal + fCal === 0) return;
+  const css = getComputedStyle(document.documentElement);
+  new Chart(el, {
+    type: "doughnut",
+    data: {
+      labels: ["Protein", "Carbs", "Fat"],
+      datasets: [{
+        data: [pCal, cCal, fCal],
+        backgroundColor: [
+          css.getPropertyValue("--accent-2").trim() || "#5599ff",
+          css.getPropertyValue("--accent-1").trim() || "#c8f55a",
+          "#ff9944"
+        ],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      cutout: "68%",
+      plugins: { legend: { position: "bottom", labels: { color: css.getPropertyValue("--text1").trim() || "#b0b0b0", font: { size: 11 } } } }
+    }
+  });
+})();
 </script>
 {% endblock %}

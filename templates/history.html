@@ -1,0 +1,29 @@
+{% extends "app_base.html" %}
+{% block main %}
+<div class="page">
+  <div class="head-wrap">
+    <div class="page-title">Workout History</div>
+    <div class="page-sub">Your last 30 days of logged training</div>
+  </div>
+
+  {% if not days %}
+    <div class="card"><div class="page-sub">No workouts logged in the last 30 days. Log a session and it'll show up here.</div></div>
+  {% else %}
+    {% for d in days %}
+    <div class="card mb16">
+      <div class="section-title">{{ d.date }}</div>
+      {% for it in d.entries %}
+      <div class="ex-row" style="margin-bottom:8px;">
+        <div style="flex:1;">
+          <div class="ex-name">{{ it.name }}{% if it.category %} <span class="page-sub">· {{ it.category }}</span>{% endif %}</div>
+          <div class="ex-detail">
+            {{ it.sets }} sets × {{ it.reps }} reps{% if it.weight %} @ {{ it.weight }}kg{% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -3,20 +3,28 @@
 <div class="page">
   <div class="head-wrap">
     <div class="page-title">Exercise Library</div>
-    <div class="page-sub">{{ exercises|length }} exercises · search and learn proper form</div>
+    <div class="page-sub">{{ exercises|length }} exercises across {{ categories|length }} categories · search and learn proper form</div>
   </div>
 
   <input class="input" id="lib-search" placeholder="Search exercises, muscles, equipment..." oninput="filterLib()" style="margin-bottom:16px;">
   <div style="display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;" id="filters">
-    {% for f in ['all','back','chest','legs','shoulders','arms','core','cardio'] %}
-    <button class="chip {{ 'active' if f=='all' }}" data-f="{{ f }}" onclick="setFilter(this)" style="text-transform:capitalize;">{{ f }}</button>
+    <button class="chip active" data-f="all" onclick="setFilter(this)">All</button>
+    {% for cat in categories %}
+    <button class="chip cat-chip" data-f="{{ cat|lower }}" data-cat="{{ cat }}" onclick="setFilter(this)"
+            style="border-color:{{ cat_colors[cat] }}; color:{{ cat_colors[cat] }};">{{ cat }}</button>
     {% endfor %}
   </div>
 
   <div class="lib-grid" id="lib-grid">
     {% for e in exercises %}
-    <div class="lib-card" data-hay="{{ (e.name ~ ' ' ~ e.muscles_primary|join(' ') ~ ' ' ~ e.muscles_secondary|join(' ') ~ ' ' ~ e.search_tags|join(' ') ~ ' ' ~ (e.equipment or ''))|lower }}" onclick='openLib({{ e|tojson }})'>
-      <div class="lib-img">◍</div>
+    <div class="lib-card"
+         data-hay="{{ (e.name ~ ' ' ~ (e.category or '') ~ ' ' ~ e.muscles_primary|join(' ') ~ ' ' ~ e.muscles_secondary|join(' ') ~ ' ' ~ e.search_tags|join(' ') ~ ' ' ~ (e.equipment or ''))|lower }}"
+         data-cat="{{ (e.category or 'other')|lower }}"
+         onclick='openLib({{ e|tojson }})'>
+      <div class="lib-img" style="color:{{ cat_colors.get(e.category, '#888') }};">◍</div>
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+        <span class="cat-badge" style="background:{{ cat_colors.get(e.category, '#888') }}22; color:{{ cat_colors.get(e.category, '#888') }}; border:1px solid {{ cat_colors.get(e.category, '#888') }}55;">{{ e.category or 'Other' }}</span>
+      </div>
       <div class="lib-name">{{ e.name }}</div>
       <div class="lib-muscle">{{ e.muscles_primary|join(' · ') }}</div>
       <div class="tags">
@@ -34,6 +42,7 @@
   <div class="modal">
     <div class="modal-head"><div class="modal-title" id="lib-m-name"></div>
       <button class="close-btn" onclick="document.getElementById('lib-modal').classList.remove('open')">✕</button></div>
+    <div style="margin-bottom:12px;"><span id="lib-m-cat" class="cat-badge"></span></div>
     <div style="font-size:12px; color:var(--accent-1); margin-bottom:12px;" id="lib-m-muscle"></div>
     <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Step-by-step</div>
     <div class="steps" id="lib-m-steps"></div>
@@ -41,14 +50,21 @@
   </div>
 </div>
 
+<style>
+  .cat-badge { display:inline-block; font-size:10px; padding:2px 9px; border-radius:20px;
+    font-weight:600; text-transform:uppercase; letter-spacing:0.5px; }
+</style>
+
 <script>
+const CAT_COLORS = {{ cat_colors|tojson }};
+
 function filterLib() {
   const q = document.getElementById("lib-search").value.toLowerCase();
   const active = document.querySelector("#filters .chip.active").dataset.f;
   let shown = 0;
   document.querySelectorAll(".lib-card").forEach(c => {
     const hay = c.dataset.hay;
-    const ok = (!q || hay.includes(q)) && (active === "all" || hay.includes(active));
+    const ok = (!q || hay.includes(q)) && (active === "all" || c.dataset.cat === active);
     c.style.display = ok ? "block" : "none";
     if (ok) shown++;
   });
@@ -61,6 +77,13 @@ function setFilter(btn) {
 }
 function openLib(e) {
   document.getElementById("lib-m-name").textContent = e.name;
+  const cat = e.category || "Other";
+  const color = CAT_COLORS[cat] || "#888";
+  const catEl = document.getElementById("lib-m-cat");
+  catEl.textContent = cat;
+  catEl.style.background = color + "22";
+  catEl.style.color = color;
+  catEl.style.border = "1px solid " + color + "55";
   document.getElementById("lib-m-muscle").textContent = (e.muscles_primary||[]).concat(e.muscles_secondary||[]).join(" · ");
   document.getElementById("lib-m-steps").innerHTML = (e.steps||[]).map((s,i) =>
     `<div class="step"><div class="step-num">${i+1}</div><div class="step-text">${s}</div></div>`).join("");

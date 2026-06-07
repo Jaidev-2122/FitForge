@@ -18,6 +18,7 @@
     <div class="sb-nav">
       <a href="{{ url_for('dashboard') }}" class="sb-item {{ 'active' if active_path == '/dashboard' }}">▦ Dashboard</a>
       <a href="{{ url_for('workout') }}" class="sb-item {{ 'active' if active_path == '/workout' }}">▶ Today's Workout</a>
+      <a href="{{ url_for('history') }}" class="sb-item {{ 'active' if active_path == '/history' }}">↺ History</a>
       <a href="{{ url_for('planner') }}" class="sb-item {{ 'active' if active_path == '/planner' }}">▤ Weekly Planner</a>
       <a href="{{ url_for('statistics') }}" class="sb-item {{ 'active' if active_path == '/statistics' }}">▲ Statistics</a>
       <a href="{{ url_for('lifestyle') }}" class="sb-item {{ 'active' if active_path == '/lifestyle' }}">♥ Lifestyle</a>

@@ -10,10 +10,12 @@
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 *,*::before,*::after { transition: background-color .4s ease, border-color .4s ease, color .3s ease; }
+html { background:var(--bg0); }
 html,body {
-  background:var(--bg0); color:var(--text0); min-height:100vh;
+  color:var(--text0); min-height:100vh;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-size:14px;
 }
+body { background:transparent; }
 a { color:var(--accent-1); text-decoration:none; }
 button { cursor:pointer; font-family:inherit; font-size:inherit; }
 input,select,textarea { font-family:inherit; font-size:inherit; }
@@ -30,6 +32,7 @@ input,select,textarea { font-family:inherit; font-size:inherit; }
 
 /* ---------- layout ---------- */
 .app { display:flex; min-height:100vh; }
+.sidebar { backdrop-filter: blur(6px); }
 .sidebar { width:230px; min-width:230px; background:var(--bg1); border-right:1px solid var(--border);
   display:flex; flex-direction:column; height:100vh; position:sticky; top:0; }
 .sb-logo { padding:20px 18px 16px; border-bottom:1px solid var(--border); }
@@ -246,3 +249,124 @@ input,select,textarea { font-family:inherit; font-size:inherit; }
   .bottom-nav { display: none; }
   .mobile-exp { display: none; }
 }
+
+/* ============================================================
+   Animated "dust waves" background (medium intensity)
+   ============================================================ */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--bg0);
+}
+/* custom image / preset wallpaper layer */
+.bg-image {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.bg-image::after {  /* darkening veil so foreground stays readable */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(10,10,10,0.72);
+}
+:root[data-theme="light"] .bg-image::after { background: rgba(248,248,245,0.78); }
+
+/* flowing wave bands built from radial/linear gradients */
+.wave {
+  position: absolute;
+  width: 160%;
+  height: 160%;
+  left: -30%;
+  top: -30%;
+  border-radius: 42% 58% 60% 40% / 45% 45% 55% 55%;
+  opacity: 0.10;
+  filter: blur(8px);
+  background: radial-gradient(closest-side, var(--accent-1), transparent 70%);
+  animation: waveDrift 26s ease-in-out infinite;
+}
+.wave.w2 {
+  background: radial-gradient(closest-side, var(--accent-2), transparent 70%);
+  opacity: 0.09;
+  animation-duration: 34s;
+  animation-direction: reverse;
+  border-radius: 55% 45% 48% 52% / 52% 48% 52% 48%;
+}
+.wave.w3 {
+  background: radial-gradient(closest-side, var(--accent-1), transparent 72%);
+  opacity: 0.06;
+  animation-duration: 44s;
+  left: 10%; top: 5%;
+  width: 120%; height: 120%;
+}
+@keyframes waveDrift {
+  0%   { transform: translate(0,0) rotate(0deg) scale(1); }
+  33%  { transform: translate(6%, 4%) rotate(8deg) scale(1.08); }
+  66%  { transform: translate(-5%, 7%) rotate(-6deg) scale(0.96); }
+  100% { transform: translate(0,0) rotate(0deg) scale(1); }
+}
+/* fine dust speckle drifting over the waves */
+.dust {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, color-mix(in srgb, var(--accent-1) 40%, transparent), transparent),
+    radial-gradient(1.5px 1.5px at 70% 60%, color-mix(in srgb, var(--accent-2) 40%, transparent), transparent),
+    radial-gradient(1px 1px at 45% 80%, color-mix(in srgb, var(--accent-1) 30%, transparent), transparent),
+    radial-gradient(1px 1px at 85% 20%, color-mix(in srgb, var(--accent-2) 30%, transparent), transparent),
+    radial-gradient(1px 1px at 30% 55%, color-mix(in srgb, var(--accent-1) 25%, transparent), transparent);
+  background-size: 600px 600px, 700px 700px, 500px 500px, 650px 650px, 550px 550px;
+  opacity: 0.5;
+  animation: dustFloat 60s linear infinite;
+}
+@keyframes dustFloat {
+  from { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+  to   { background-position: 600px 300px, -700px 400px, 500px -300px, -650px 200px, 300px 550px; }
+}
+/* respect reduced-motion accessibility preference */
+@media (prefers-reduced-motion: reduce) {
+  .wave, .dust { animation: none; }
+}
+
+/* ---- Let the animated background subtly show through the portal ---- */
+.sidebar { background: color-mix(in srgb, var(--bg1) 86%, transparent); }
+.card { background: color-mix(in srgb, var(--bg1) 88%, transparent); backdrop-filter: blur(3px); }
+.main { background: transparent; }
+/* On a custom photo background, make panels a touch more opaque for readability */
+.has-photo-bg .card { background: color-mix(in srgb, var(--bg1) 94%, transparent); }
+.has-photo-bg .sidebar { background: color-mix(in srgb, var(--bg1) 92%, transparent); }
+
+/* ---- Preset gradient wallpapers (no image files needed) ---- */
+.bg-preset {
+  position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background-size: cover; background-attachment: fixed;
+}
+.bg-preset::after {
+  content: ""; position: absolute; inset: 0; background: rgba(10,10,10,0.55);
+}
+:root[data-theme="light"] .bg-preset::after { background: rgba(248,248,245,0.55); }
+
+.bg-preset-aurora  { background: linear-gradient(135deg, #0a0f1f 0%, #1a3a4a 35%, #2d6b5e 70%, #1a3a2a 100%); }
+.bg-preset-nebula  { background: radial-gradient(circle at 30% 30%, #3a1a5e, transparent 55%), radial-gradient(circle at 70% 70%, #5e1a3a, transparent 55%), #0a0a14; }
+.bg-preset-mesh    { background: linear-gradient(120deg, #1a1a2e, #16213e 40%, #0f3460 80%); }
+.bg-preset-sunset  { background: linear-gradient(160deg, #1a0f1f 0%, #4a1f2d 40%, #7a3a2d 70%, #2a1a0f 100%); }
+.bg-preset-forest  { background: linear-gradient(150deg, #0a1f14 0%, #1a3a24 45%, #2d4a2d 75%, #0f1f14 100%); }
+.bg-preset-ocean   { background: linear-gradient(160deg, #0a1422 0%, #16314a 40%, #1a4a5e 70%, #0a2430 100%); }
+
+/* Preset swatches in settings: reuse the gradients but as small inline tiles */
+.preset-swatch.bg-preset-aurora,
+.preset-swatch.bg-preset-nebula,
+.preset-swatch.bg-preset-mesh,
+.preset-swatch.bg-preset-sunset,
+.preset-swatch.bg-preset-forest,
+.preset-swatch.bg-preset-ocean {
+  position: relative; inset: auto;
+}
+.preset-swatch.active { outline: 2px solid var(--accent-1); outline-offset: 1px; }
