@@ -1,143 +1,151 @@
-# FitForge — AI Fitness OS (multi-user)
+# FitForge — AI Fitness OS
 
-A personal AI fitness tracker. Open it, type your name, take a short quiz, and
-you're in — no accounts, no passwords. One profile, stored in Supabase. AI
-features run on Gemini 2.5 Flash.
+A personal AI fitness companion built with Python and Flask. Sign up, take a 30-question onboarding quiz, and Gemini 2.5 Flash builds you a personalised weekly training plan and nutrition brief. Log your workouts, earn EXP, and your routine evolves as you progress.
 
-## How it works
+**Live:** [fit-forge-02r9.onrender.com](https://fit-forge-02r9.onrender.com)
 
-- **No auth.** First visit → enter name → quiz → AI builds your routine + diet
-  plan. After that it goes straight to your dashboard. "Start over" (bottom of
-  the sidebar) re-takes the quiz and clears your data.
-- **Single user.** It's your own tracker. The server uses Supabase's
-  service-role key to read/write one fixed profile. Nothing is exposed to the
-  browser, so this is safe for a personal app.
+---
 
-## AI features (Gemini 2.5 Flash)
+## What it does
 
-- Routine generation from the quiz
-- Routine evolution (EXP-gated, on the Planner page)
-- Ask-trainer chat + "Motivate me" (Motivation page)
-- Weekly analysis of workouts / water / sleep / food (button on Diet page)
-- Daily note on the dashboard
+**AI features (Gemini 2.5 Flash)**
+- Generates a personalised weekly routine from your quiz answers — matches your equipment, available days, injuries, experience, and goal
+- Evolves the routine when you earn enough EXP, using your last 60 workout logs to decide what to progress and what to regress
+- AI coach chat that knows your real data (streak, weight, today's water and sleep) — not a generic chatbot
+- Proactive weekly pattern analysis on the dashboard ("your energy drops every day you sleep under 6h")
+- Motivation page with AI-generated push messages
 
-Zero-cost (no AI): static form tips in workouts, and manual food logging
-(type macros yourself, or search the seeded food database to autofill them).
+**Training**
+- 52 exercises across 10 colour-coded categories: Chest, Back, Shoulders, Arms, Thighs, Glutes, Core, Calves, Posture, Cardio
+- Step-by-step form instructions and static form tips for every exercise (zero API cost)
+- EXP system: compound lifts worth more, progressive overload rewarded, streaks multiply earnings
+- Personal record detection — beat your best weight on a lift and you get +50 EXP and a trophy notification
+- Miss a scheduled workout and lose 30 EXP (idempotent — checked once per day on dashboard load)
+- Rest timer built into the workout modal (60s / 90s / 2 min)
+- Workout history — last 30 days of logged sessions
 
-## Local setup
+**Tracking**
+- Diet tracker: search the food database to autofill macros, or type them manually. Macro donut chart and AI weekly analysis
+- Lifestyle: water intake (tap-to-log cups), sleep hours and quality, daily energy
+- Statistics: weight, BMI, water, and sleep charts over 60 days
+- Profile page: lifetime stats, achievements, body weight progress, and full routine version history
+
+**Customisation**
+- Two-colour accent theme (pick any two colours, light or dark mode)
+- Animated dust-waves background on every page, or choose a preset gradient wallpaper (aurora, nebula, mesh, sunset, forest, ocean), paste a custom image URL, or go plain
+
+**Auth**
+- Sign up with email + password, or username + 4-digit PIN
+- Accounts locked for 15 minutes after 5 failed attempts (makes the short PIN safe)
+- Each user's data is completely private
+
+---
+
+## Tech stack
+
+| Layer | What |
+|---|---|
+| Backend | Python 3.12, Flask 3.0 |
+| Database | Supabase (Postgres + custom auth) |
+| AI | Gemini 2.5 Flash via REST |
+| Deployment | Render (gunicorn, single worker) |
+| Frontend | Server-rendered Jinja2, vanilla JS |
+| PWA | Web manifest + service worker (installable on iPhone) |
+
+---
+
+## Project structure
+
+```
+app.py                  — all routes: auth, pages, AI, EXP, evolution
+lib/
+  auth.py               — hashing (PBKDF2), validation, lockout logic
+  supabase_client.py    — service-role Supabase client
+  gemini.py             — Gemini 2.5 Flash REST wrapper
+  exp.py                — EXP scoring engine (pure functions)
+  tips.py               — static form tips (zero API cost)
+templates/              — 16 Jinja2 templates
+static/
+  css/style.css         — dark-minimal theme, animations
+  manifest.json         — PWA manifest
+  sw.js                 — service worker
+```
+
+---
+
+## Running locally
 
 ```bash
+git clone https://github.com/Jaidev-2122/FitForge.git
+cd FitForge
+
 python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
+
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env:
-#   FLASK_SECRET_KEY     -> python -c "import secrets; print(secrets.token_hex(32))"
-#   SUPABASE_SERVICE_KEY -> Supabase dashboard > Settings > API > service_role
-#   GEMINI_API_KEY       -> https://aistudio.google.com/apikey (free tier)
-#   SUPABASE_URL is already filled
+# Fill in FLASK_SECRET_KEY, SUPABASE_SERVICE_KEY, GEMINI_API_KEY
 
-flask --app app run --debug
-# open http://localhost:5000
+FITFORGE_ALLOW_DEV_SECRET=1 flask --app app run --debug
+# Open http://localhost:5000
 ```
 
-Runs on **port 5000**.
+---
 
-## Database
+## Deploying to Render
 
-Already set up on the linked Supabase project, now in single-user mode: RLS is
-off (one user, server-side service key only), one fixed profile row, and seed
-data (15 exercises, 15 foods). Nothing to run.
+1. Push repo to GitHub
+2. Render → **New → Web Service** → connect repo
+3. Build command: `pip install -r requirements.txt`
+4. Start command: `gunicorn app:app --workers 1 --threads 4 --timeout 120`
+5. Add environment variables:
 
-## Deploying
+| Variable | Where to get it |
+|---|---|
+| `FLASK_SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `SUPABASE_URL` | Supabase dashboard → Settings → API |
+| `SUPABASE_SERVICE_KEY` | Supabase dashboard → Settings → API → service_role |
+| `GEMINI_API_KEY` | aistudio.google.com/apikey |
 
-Standard Flask + gunicorn (`Procfile` and `runtime.txt` included). Not Vercel.
+> `--workers 1` is required on the free tier. Multiple workers cause out-of-memory crashes during the AI onboarding step.
 
-**Render (recommended, free):** New → Web Service → connect repo →
-build `pip install -r requirements.txt`, start `gunicorn app:app` → add env
-vars `FLASK_SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY`.
+---
 
-Also fine: Railway (auto-detects Procfile) or PythonAnywhere.
+## Installing as a mobile app
 
-## Structure
+FitForge is a Progressive Web App — no App Store needed.
 
-```
-app.py                  # all routes: welcome/quiz, pages, AI endpoints, EXP, evolution
-lib/
-  supabase_client.py    # single service-role client + fixed USER_ID
-  gemini.py             # Gemini 2.5 Flash wrapper
-  exp.py                # EXP scoring + BMI
-  tips.py               # static form tips (zero API)
-templates/              # welcome, dashboard, workout, planner, statistics,
-                        # lifestyle, diet, library, motivation, settings
-static/css/style.css    # dark-minimal theme, two-colour system
-```
+**iPhone:** Safari → Share button → **Add to Home Screen**
 
-## Security note
+**Android:** Chrome → three-dot menu → **Add to Home screen**
 
-The service-role key bypasses all database protection — fine for a single-user
-app where only your server holds it, but never expose it in the browser, and
-rotate it if it ever leaks (Supabase → Settings → API).
+---
 
+## Security
 
-## Recent improvements
+- Passwords and PINs hashed with PBKDF2 via Werkzeug — plaintext never stored
+- 5-attempt lockout makes the 4-digit PIN safe against guessing — do not remove this
+- Supabase service-role key stays server-side only
+- Every query scoped to the logged-in user's ID
+- `FLASK_SECRET_KEY` is required — app refuses to start without it in production
+- `.env` is gitignored — never commit secrets
 
-- **Fixed:** Lifestyle page 500 error (occurred when no log existed yet for the day).
-- **Smarter AI chat:** the coach now reads your real data (streak, goal, recent weight, today's water/sleep) and talks like it knows you, not a generic bot.
-- **Better routine tailoring:** the generator now matches your equipment, available days, session length, injuries, experience and goal — no more baseline templates.
-- **Proactive coach:** the dashboard auto-loads a weekly pattern insight ("your energy dips every day you sleep under 6h"), and the Diet page has an on-demand analysis.
-- **Profile page:** identity, lifetime stats, achievements, body-weight progress, and full routine-version history. Reachable from the sidebar avatar or the Profile nav item.
-- **Richer dashboard:** quick-log shortcuts for workout / water / meals.
+---
 
+## Not built yet
 
-## Multi-user (accounts)
+- CSRF protection on forms
+- Password reset via email
+- Open Food Facts integration
+- Body measurements tracking
+- Server-side chat history
+- Weekly email summary
+- CSV data export
 
-FitForge now supports multiple people, each with their own private data.
+---
 
-**Two ways to sign up:**
-- Email + password (password min 8 characters)
-- Username + 4-digit PIN (no email needed)
+## Built by
 
-**Security built in (don't remove these):**
-- Passwords and PINs are hashed with PBKDF2 (werkzeug) — never stored as plaintext.
-- After 5 failed login attempts an account locks for 15 minutes. This is what
-  makes a 4-digit PIN safe against online guessing — a PIN alone is only 10,000
-  combinations, so the lockout is essential.
-- Login errors are generic ("Invalid credentials") so they never reveal whether
-  an account exists.
-- Every database query is scoped to the logged-in user, so people only ever see
-  their own routine, logs, and progress.
-
-**Sharing with friends:** just send them your deployed URL. They tap Sign up,
-pick a method, and get their own separate account and AI plan. Anyone with the
-link can sign up (no invite gate).
-
-**Note:** moving to multi-user cleared the old single-user test data. Everyone
-(including you) signs up fresh.
-
-
-## Multi-user & accounts
-
-FitForge now supports multiple people, each with their own private data.
-
-**Two ways to sign up:**
-- **Email + password** (password min 8 characters)
-- **Username + 4-digit PIN** (no email needed)
-
-Log in with either your email or your username, plus your password/PIN.
-
-**Security built in:**
-- Passwords and PINs are hashed (PBKDF2 via Werkzeug) — never stored as plaintext.
-- After 5 failed login attempts an account locks for 15 minutes. This is what
-  keeps a short PIN safe from guessing — do not remove it.
-- Every database query is scoped to the logged-in user, so people only ever
-  see their own workouts, diet, and progress.
-- Login errors are generic ("invalid credentials") and never reveal whether an
-  account exists.
-
-**Sharing the app:** anyone with the link can create an account and use it with
-their own separate data. Send friends your Vercel/Render URL and they sign up.
-
-**Note:** moving to multi-user cleared the old single-user test data. Everyone
-(including you) signs up fresh on first visit.
+Jaidev — systems-oriented builder working toward AI Systems Engineering.
+Built as a learning exercise in AI integration, full-stack Python, and product thinking.
