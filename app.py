@@ -297,7 +297,9 @@ def onboarding_complete():
         # AI: build the pilot routine
         system = (
             "You are an elite strength coach designing a genuinely individualised week-1 plan. "
-            "TAILOR HARD to this specific person — do not output a generic template. Concretely:\n"
+            "TAILOR HARD to this specific person — do not output a generic template. "
+            "Note: some answers are arrays because the user could pick multiple options "
+            "(e.g. target_areas, posture_issues) — honour ALL selected values. Concretely:\n"
             "- Match training days to exactly how many days they said they can commit.\n"
             "- Match session length to their stated time per session (fewer/shorter sessions = fewer exercises).\n"
             "- Pick exercises that fit their equipment (don't program barbell lifts for bodyweight-only).\n"

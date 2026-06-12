@@ -39,7 +39,7 @@
 const QUESTIONS = [
   // ---- Tier 1: the basics ----
   {key:"age", q:"How old are you?", type:"number", tier:1},
-  {key:"biological_sex", q:"Biological sex? (affects training & recovery response)", type:"choice", options:["male","female","other"], tier:1},
+  {key:"biological_sex", q:"Biological sex? (affects training & recovery response)", type:"choice", single:true, options:["male","female","other"], tier:1},
   {key:"height_cm", q:"Your height in cm?", type:"number", tier:1},
   {key:"weight_kg", q:"Current weight in kg?", type:"number", tier:1},
   {key:"country", q:"Which country are you in? (for cheap local food ideas)", type:"text", tier:1},
@@ -100,9 +100,28 @@ function render() {
   nextBtn.textContent = isLast ? "Build my plan" : "Next →";
 
   if (q.type === "choice") {
-    nextBtn.style.display = "none";
-    area.innerHTML = `<div class="ob-options">` + q.options.map(o =>
-      `<button class="ob-opt ${answers[q.key]===o?'sel':''}" onclick="choose('${o.replace(/'/g,"\\'")}')">${o}</button>`).join("") + `</div>`;
+    const multi = !q.single;  // every choice question is multi-select unless flagged single
+    // selected is always stored as an array internally for choice questions
+    const sel = Array.isArray(answers[q.key]) ? answers[q.key]
+              : (answers[q.key] ? [answers[q.key]] : []);
+    answers[q.key] = sel;
+
+    let html = "";
+    if (multi) html += `<div class="ob-hint">Pick all that apply — choose one or more.</div>`;
+    html += `<div class="ob-options">` + q.options.map(o => {
+      const on = sel.includes(o);
+      return `<button class="ob-opt ${on ? 'sel' : ''}" onclick="toggle('${o.replace(/'/g,"\\'")}')">
+                ${multi ? `<span class="ob-check">${on ? '✓' : ''}</span>` : ''}${o}
+              </button>`;
+    }).join("") + `</div>`;
+    area.innerHTML = html;
+
+    if (multi) {
+      // multi-select needs an explicit confirm; single auto-advances on tap
+      nextBtn.style.display = "inline-flex";
+    } else {
+      nextBtn.style.display = "none";
+    }
   } else {
     nextBtn.style.display = "inline-flex";
     area.innerHTML = `<input class="input" id="ob-input" type="${q.type==='number'?'number':'text'}" placeholder="Type your answer..." value="${answers[q.key]||''}" style="margin-bottom:20px;">`
@@ -113,11 +132,24 @@ function render() {
   }
 }
 
-function choose(val) { answers[QUESTIONS[step].key] = val; advance(); }
+// single-select: set + advance. multi-select: toggle in array, stay put.
+function toggle(val) {
+  const q = QUESTIONS[step];
+  if (q.single) { answers[q.key] = val; advance(); return; }
+  const arr = Array.isArray(answers[q.key]) ? answers[q.key] : [];
+  const i = arr.indexOf(val);
+  if (i >= 0) arr.splice(i, 1); else arr.push(val);
+  answers[q.key] = arr;
+  render();  // re-render to update checkmarks
+}
 function skip() { answers[QUESTIONS[step].key] = ""; advance(); }
 function next() {
   const q = QUESTIONS[step];
-  if (q.type !== "choice") {
+  if (q.type === "choice") {
+    // require at least one selection on multi-select choice questions
+    const sel = answers[q.key];
+    if ((!Array.isArray(sel) || sel.length === 0) && !q.optional) return;
+  } else {
     const v = document.getElementById("ob-input").value;
     if (!v && !q.optional) return;
     answers[q.key] = v;
