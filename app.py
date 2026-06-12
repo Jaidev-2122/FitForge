@@ -39,17 +39,17 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 
 
 def known_exercises_text():
-    """Build the exercise list for AI prompts from the live database, grouped
-    by category so the AI picks sensible, varied movements. Falls back to a
-    minimal set if the DB read fails."""
+    """Compact exercise list for AI prompts from the live database, grouped by
+    category, with focus tags (flexibility/mobility/cardio) so the AI can
+    program stretches and posture work — not just lifts."""
     try:
-        rows = db().table("exercises").select("name,category,equipment").order("category").execute().data
+        rows = db().table("exercises").select("name,category,focus").order("category").execute().data
         by_cat = {}
         for r in rows:
-            by_cat.setdefault(r.get("category") or "Other", []).append(
-                f"{r['name']} ({r.get('equipment') or 'any'})")
-        lines = [f"{cat}: {', '.join(names)}" for cat, names in by_cat.items()]
-        return "\n".join(lines)
+            focus = r.get("focus") or "strength"
+            tag = f" [{focus}]" if focus != "strength" else ""
+            by_cat.setdefault(r.get("category") or "Other", []).append(r["name"] + tag)
+        return "\n".join(f"{cat}: {', '.join(names)}" for cat, names in by_cat.items())
     except Exception:
         return ("Chest: Bench Press, Push-ups | Back: Barbell Row, Pull-ups | "
                 "Thighs: Barbell Squat | Glutes: Romanian Deadlift | "
@@ -84,10 +84,10 @@ def first_row(query):
 
 def _norm_name(name):
     """Normalize an exercise name for matching: lowercase, drop any
-    parenthetical (e.g. equipment), strip whitespace."""
+    parenthetical or [focus] tag, strip whitespace."""
     if not name:
         return ""
-    base = name.split("(")[0]
+    base = name.split("(")[0].split("[")[0]
     return base.strip().lower()
 
 
@@ -123,6 +123,32 @@ def build_user_context(deep=False):
         ctx["today_water_glasses"] = today_life.get("water_glasses")
         ctx["today_sleep_hours"] = today_life.get("sleep_hours")
         ctx["today_energy"] = today_life.get("energy_level")
+
+    # Personal records + lifetime volume, so the coach can answer
+    # "what's my bench PR" / "how many sessions have I done" precisely.
+    try:
+        logs = (d.table("workout_logs")
+                .select("weight_used_kg,logged_date,day_exercise:day_exercises(exercise:exercises(name))")
+                .eq("user_id", uid()).order("weight_used_kg", desc=True).limit(200).execute().data)
+        ctx["total_logged_sets"] = len(logs)
+        ctx["workout_days_count"] = len({l.get("logged_date") for l in logs if l.get("logged_date")})
+        prs = {}
+        for l in logs:
+            de = l.get("day_exercise") or {}
+            if isinstance(de, list):
+                de = de[0] if de else {}
+            ex = (de or {}).get("exercise") or {}
+            if isinstance(ex, list):
+                ex = ex[0] if ex else {}
+            nm = ex.get("name")
+            w = l.get("weight_used_kg") or 0
+            if nm and w and (nm not in prs or w > prs[nm]):
+                prs[nm] = w
+        if prs:
+            top = sorted(prs.items(), key=lambda kv: -kv[1])[:8]
+            ctx["personal_records_kg"] = dict(top)
+    except Exception:
+        pass
 
     if deep:
         since = (date.today() - timedelta(days=7)).isoformat()
@@ -280,7 +306,7 @@ def onboarding_complete():
             "muscle = more sets near failure; general = balanced).\n"
             "- Scale starting load to their experience: a true beginner starts very light / bodyweight; "
             "an experienced lifter can handle real working weights.\n"
-            "It is still their PILOT WEEK, so set targets ~15% below their likely ceiling — but the plan should "
+            "Weave in flexibility/mobility/posture work where the answers call for it (desk job, posture issues, poor flexibility, stated stretch goals) — e.g. finish sessions with 1-2 [flexibility] picks, use [mobility] items as warm-ups. It is still their PILOT WEEK, so set targets ~15% below their likely ceiling — but the plan should "
             "still feel clearly built FOR THEM. In ai_summary, explain in 2-3 sentences WHY this plan fits THIS person "
             "(name their goal, days, and one specific choice you made for them).\n"
             "Output strict JSON only. Schema: {\"ai_summary\": str, \"exp_gate\": int (800-1500), "
@@ -322,31 +348,48 @@ def onboarding_complete():
             if rows:
                 d.table("day_exercises").insert(rows).execute()
 
-        # AI: nutrition brief (targets + local food ideas)
-        diet_system = (
-            "You are a sports nutritionist. Produce daily targets and cheap, locally-available food ideas "
-            "for the user's country. Output strict JSON only: {\"kcal_target\": int, \"protein_g_target\": int, "
-            "\"carbs_g_target\": int, \"fat_g_target\": int, \"water_ml_target\": int, \"sleep_hrs_target\": number, "
-            "\"food_ideas\": [{\"name\": str, \"why\": str}] (6-8 cheap, easy items)}."
-        )
-        try:
-            draw = generate(system=diet_system, parts=[{"text": json.dumps(answers, indent=2)}],
-                            json_mode=True, temperature=0.5)
-            diet = parse_json(draw)
-            d.table("diet_targets").insert({
-                "user_id": uid(),
-                "kcal_target": diet.get("kcal_target"), "protein_g_target": diet.get("protein_g_target"),
-                "carbs_g_target": diet.get("carbs_g_target"), "fat_g_target": diet.get("fat_g_target"),
-                "water_ml_target": diet.get("water_ml_target"), "sleep_hrs_target": diet.get("sleep_hrs_target"),
-                "food_ideas": diet.get("food_ideas", []),
-            }).execute()
-        except Exception:
-            pass
+        # Nutrition brief is generated by the separate /onboarding/diet call
+        # afterwards — keeping THIS request to a single Gemini call avoids the
+        # free-tier out-of-memory worker kill.
 
         d.table("profiles").update({"onboarding_done": True}).eq("id", uid()).execute()
-        return jsonify({"ok": True})
+        return jsonify({"ok": True, "needs_diet": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/onboarding/diet", methods=["POST"])
+@login_required
+def onboarding_diet():
+    """Generate the nutrition brief separately after the main onboarding
+    completes. Keeps the main onboarding request lean and avoids OOM kills."""
+    answers = request.get_json(silent=True) or {}
+    diet_system = (
+        "You are a sports nutritionist. Produce daily targets and cheap, "
+        "locally-available food ideas for the user's country. "
+        "Output strict JSON: {\"kcal_target\": int, \"protein_g_target\": int, "
+        "\"carbs_g_target\": int, \"fat_g_target\": int, \"water_ml_target\": int, "
+        "\"sleep_hrs_target\": number, "
+        "\"food_ideas\": [{\"name\": str, \"why\": str}] (6-8 items)}."
+    )
+    try:
+        draw = generate(system=diet_system,
+                        parts=[{"text": json.dumps(answers, indent=2)}],
+                        json_mode=True, temperature=0.5)
+        diet = parse_json(draw)
+        db().table("diet_targets").insert({
+            "user_id": uid(),
+            "kcal_target": diet.get("kcal_target"),
+            "protein_g_target": diet.get("protein_g_target"),
+            "carbs_g_target": diet.get("carbs_g_target"),
+            "fat_g_target": diet.get("fat_g_target"),
+            "water_ml_target": diet.get("water_ml_target"),
+            "sleep_hrs_target": diet.get("sleep_hrs_target"),
+            "food_ideas": diet.get("food_ideas", []),
+        }).execute()
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
 
 
 @app.route("/reset", methods=["POST"])
@@ -798,7 +841,11 @@ def library():
 @app.route("/motivation")
 @onboarding_required
 def motivation():
-    return render_template("motivation.html", profile=get_profile())
+    # Recent conversation so the chat picks up where it left off, any device.
+    recent = (db().table("chat_history").select("role,content")
+              .eq("user_id", uid()).order("created_at", desc=True).limit(20).execute().data)
+    return render_template("motivation.html", profile=get_profile(),
+                           chat_history=list(reversed(recent or [])))
 
 
 # ----------------------------- profile -----------------------------
@@ -894,6 +941,21 @@ def settings_background():
     return redirect(url_for("settings"))
 
 
+@app.route("/settings/music", methods=["POST"])
+@onboarding_required
+def settings_music():
+    enabled = request.form.get("music_enabled") == "on"
+    url = (request.form.get("music_url") or "").strip()
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        flash("Music URL must start with http:// or https:// (leave blank for built-in ambient).")
+        return redirect(url_for("settings"))
+    db().table("profiles").update({
+        "music_enabled": enabled,
+        "music_url": url or None,
+    }).eq("id", uid()).execute()
+    return redirect(url_for("settings"))
+
+
 # ----------------------------- AI endpoints -----------------------------
 @app.route("/api/chat", methods=["POST"])
 @onboarding_required
@@ -901,23 +963,53 @@ def api_chat():
     if rate_limited("chat", 30):
         return jsonify({"error": "You're sending messages very fast — take a short break and try again."}), 429
     payload = request.get_json(silent=True) or {}
-    msgs = payload.get("messages", [])
-    # Pull the user's real data server-side so the AI actually knows them.
+    # New contract: client sends just {message}. Backward-compat: if an older
+    # cached frontend still sends {messages: [...]}, use its last user entry.
+    message = (payload.get("message") or "").strip()
+    if not message:
+        legacy = [m for m in payload.get("messages", []) if m.get("role") == "user"]
+        message = (legacy[-1]["content"].strip() if legacy else "")
+    if not message:
+        return jsonify({"error": "Empty message."}), 400
+    if len(message) > 2000:
+        message = message[:2000]
+    # Ephemeral mode (daily motivation blurb): no history load, no save —
+    # keeps canned prompts out of the user's real conversation memory.
+    ephemeral = bool(payload.get("ephemeral"))
+
+    d = db()
+    history = []
+    if not ephemeral:
+        # Server-owned memory: history lives in the DB, not the client, so it
+        # can't be forged and it persists across devices/sessions.
+        history = (d.table("chat_history").select("role,content")
+                   .eq("user_id", uid()).order("created_at", desc=True).limit(12).execute().data)
+        history = list(reversed(history or []))
+
     ctx = build_user_context()
     system = (
         "You are FitForge's AI coach, talking directly to {name}. You are NOT a generic chatbot — "
         "you know this person's real data (shown below) and you reference it naturally, like a coach who "
-        "remembers them. Be warm, direct, and specific. Use their name occasionally, not every line. "
-        "Call out their actual streak, goal, and recent numbers when relevant. Ask a sharp follow-up "
-        "question when it helps. Keep replies to 2-4 sentences, conversational, no markdown, no bullet lists, "
-        "no corporate hedging. If they're slacking, gently challenge them; if they're crushing it, hype them up."
+        "remembers them. If they ask about their own stats (weight, BMI, PRs, streak, workout count), "
+        "answer precisely from the data. Be warm, direct, and specific. Use their name occasionally, "
+        "not every line. Ask a sharp follow-up question when it helps. Keep replies to 2-4 sentences, "
+        "conversational, no markdown, no bullet lists, no corporate hedging. If they're slacking, gently "
+        "challenge them; if they're crushing it, hype them up."
     ).format(name=ctx.get("name") or "the user")
-    convo = "\n".join(f"{m['role']}: {m['content']}" for m in msgs)
+    convo = "\n".join(f"{m['role']}: {m['content']}" for m in history)
+    convo += ("\n" if convo else "") + f"user: {message}"
     try:
         reply = generate(system=system,
                          parts=[{"text": f"Here is everything you know about {ctx.get('name')}:\n"
                                          f"{json.dumps(ctx, indent=2)}\n\nConversation so far:\n{convo}"}],
                          temperature=0.85)
+        # Persist both sides AFTER a successful generation, so a failed AI call
+        # doesn't leave a one-sided exchange in history.
+        if not ephemeral:
+            d.table("chat_history").insert([
+                {"user_id": uid(), "role": "user", "content": message},
+                {"user_id": uid(), "role": "assistant", "content": reply},
+            ]).execute()
         return jsonify({"reply": reply})
     except Exception as e:
         return jsonify({"error": str(e)}), 500

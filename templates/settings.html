@@ -118,6 +118,26 @@ function setMode(r) {
   </form>
 </div>
 
+<div class="card" style="margin-top:16px;">
+  <div class="section-title">Background music</div>
+  <p class="page-sub" style="margin-bottom:14px;">
+    Toggle with the ♪ button in the corner of any page. The default is FitForge's
+    built-in ambient sound — or paste a direct audio URL (.mp3 etc.) to use your own.
+  </p>
+  <form method="post" action="{{ url_for('settings_music') }}">
+    <label style="display:flex; align-items:center; gap:10px; margin-bottom:14px; cursor:pointer;">
+      <input type="checkbox" name="music_enabled" {{ 'checked' if profile.music_enabled }}
+             style="width:18px; height:18px; accent-color:var(--accent-1);">
+      <span style="font-size:13px; color:var(--text1);">Remind me to turn on music (pulses the ♪ button)</span>
+    </label>
+    <div class="page-sub" style="margin-bottom:8px;">Custom audio URL (optional)</div>
+    <input class="input" name="music_url" value="{{ profile.music_url or '' }}"
+           placeholder="https://example.com/my-track.mp3 — leave blank for built-in ambient"
+           style="margin-bottom:14px;">
+    <button class="btn btn-primary" type="submit">Save music settings</button>
+  </form>
+</div>
+
 <style>
   .bg-opt { padding:8px 14px; border-radius:var(--radius); border:1px solid var(--border);
     background:transparent; color:var(--text1); font-size:13px; cursor:pointer; }

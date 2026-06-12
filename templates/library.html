@@ -14,16 +14,26 @@
             style="border-color:{{ cat_colors[cat] }}; color:{{ cat_colors[cat] }};">{{ cat }}</button>
     {% endfor %}
   </div>
+  <div style="display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap;" id="focus-filters">
+    <button class="chip active" data-fo="all" onclick="setFocus(this)">Any focus</button>
+    {% for fo in ['strength','flexibility','mobility','cardio'] %}
+    <button class="chip" data-fo="{{ fo }}" onclick="setFocus(this)" style="text-transform:capitalize;">{{ fo }}</button>
+    {% endfor %}
+  </div>
 
   <div class="lib-grid" id="lib-grid">
     {% for e in exercises %}
     <div class="lib-card"
-         data-hay="{{ (e.name ~ ' ' ~ (e.category or '') ~ ' ' ~ e.muscles_primary|join(' ') ~ ' ' ~ e.muscles_secondary|join(' ') ~ ' ' ~ e.search_tags|join(' ') ~ ' ' ~ (e.equipment or ''))|lower }}"
+         data-hay="{{ (e.name ~ ' ' ~ (e.category or '') ~ ' ' ~ (e.focus or 'strength') ~ ' ' ~ e.muscles_primary|join(' ') ~ ' ' ~ e.muscles_secondary|join(' ') ~ ' ' ~ e.search_tags|join(' ') ~ ' ' ~ (e.equipment or ''))|lower }}"
          data-cat="{{ (e.category or 'other')|lower }}"
+         data-focus="{{ (e.focus or 'strength')|lower }}"
          onclick='openLib({{ e|tojson }})'>
       <div class="lib-img" style="color:{{ cat_colors.get(e.category, '#888') }};">◍</div>
-      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap;">
         <span class="cat-badge" style="background:{{ cat_colors.get(e.category, '#888') }}22; color:{{ cat_colors.get(e.category, '#888') }}; border:1px solid {{ cat_colors.get(e.category, '#888') }}55;">{{ e.category or 'Other' }}</span>
+        {% if e.focus and e.focus != 'strength' %}
+        <span class="cat-badge" style="background:var(--bg3); color:var(--text2); border:1px solid var(--border2); text-transform:capitalize;">{{ e.focus }}</span>
+        {% endif %}
       </div>
       <div class="lib-name">{{ e.name }}</div>
       <div class="lib-muscle">{{ e.muscles_primary|join(' · ') }}</div>
@@ -61,14 +71,21 @@ const CAT_COLORS = {{ cat_colors|tojson }};
 function filterLib() {
   const q = document.getElementById("lib-search").value.toLowerCase();
   const active = document.querySelector("#filters .chip.active").dataset.f;
+  const focus = document.querySelector("#focus-filters .chip.active").dataset.fo;
   let shown = 0;
   document.querySelectorAll(".lib-card").forEach(c => {
-    const hay = c.dataset.hay;
-    const ok = (!q || hay.includes(q)) && (active === "all" || c.dataset.cat === active);
+    const ok = (!q || c.dataset.hay.includes(q))
+      && (active === "all" || c.dataset.cat === active)
+      && (focus === "all" || c.dataset.focus === focus);
     c.style.display = ok ? "block" : "none";
     if (ok) shown++;
   });
   document.getElementById("lib-empty").style.display = shown ? "none" : "block";
+}
+function setFocus(btn) {
+  document.querySelectorAll("#focus-filters .chip").forEach(c => c.classList.remove("active"));
+  btn.classList.add("active");
+  filterLib();
 }
 function setFilter(btn) {
   document.querySelectorAll("#filters .chip").forEach(c => c.classList.remove("active"));

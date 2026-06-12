@@ -2,7 +2,7 @@
 
 A personal AI fitness companion built with Python and Flask. Sign up, take a 30-question onboarding quiz, and Gemini 2.5 Flash builds you a personalised weekly training plan and nutrition brief. Log your workouts, earn EXP, and your routine evolves as you progress.
 
-**Live:** [https://fitforge-02r9.onrender.com](https://fitforge-02r9.onrender.com)
+**Live:** [fit-forge-02r9.onrender.com](https://fit-forge-02r9.onrender.com)
 
 ---
 

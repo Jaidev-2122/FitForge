@@ -60,6 +60,14 @@
     {% endif %}
   {% endwith %}
   {% block body %}{% endblock %}
+
+  {# Floating music toggle — built-in ambient by default, custom URL if set #}
+  <button id="music-toggle" class="music-btn" title="Toggle music"
+          data-enabled="{{ 'true' if shell and shell.music_enabled else 'false' }}"
+          data-url="{{ shell.music_url if shell and shell.music_url else '' }}">♪</button>
+
+  <script src="{{ url_for('static', filename='js/particles.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/music.js') }}" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/static/sw.js')

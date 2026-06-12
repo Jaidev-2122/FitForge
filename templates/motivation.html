@@ -16,6 +16,9 @@
     <div class="section-title">Ask your AI trainer</div>
     <div id="chat" style="display:flex; flex-direction:column; gap:10px; max-height:340px; overflow-y:auto; margin-bottom:12px;">
       <div class="chat-bubble ai">Hey {{ profile.display_name or 'there' }}! Ask me anything — form, nutrition, motivation, how to tweak your plan, whatever's on your mind.</div>
+      {% for m in chat_history %}
+      <div class="chat-bubble {{ 'me' if m.role == 'user' else 'ai' }}">{{ m.content }}</div>
+      {% endfor %}
     </div>
     <div style="display:flex; gap:8px;">
       <input class="input" id="chat-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter')send()">
@@ -31,15 +34,12 @@
 </style>
 
 <script>
-const ctx = { name:"{{ profile.display_name }}", goal:{{ (profile.onboarding_answers.goal if profile.onboarding_answers else '')|tojson }}, streak:{{ profile.current_streak }}, stage:"{{ profile.calibration_stage }}" };
-const history = [];
-
 async function getMotivation() {
   const el = document.getElementById("motiv");
   el.textContent = "Thinking...";
   try {
     const res = await fetch("{{ url_for('api_chat') }}", { method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ context: ctx, messages:[{role:"user", content:"Give me one punchy, personal motivational message to train today. 2-3 sentences."}] }) });
+      body: JSON.stringify({ message: "Give me one punchy, personal motivational message to train today. 2-3 sentences.", ephemeral: true }) });
     const d = await res.json();
     el.textContent = d.reply || d.error || "Could not load.";
   } catch(e) { el.textContent = "Could not reach the AI trainer."; }
@@ -55,19 +55,20 @@ async function send() {
   chat.lastElementChild.textContent = msg;
   chat.insertAdjacentHTML("beforeend", `<div class="chat-bubble ai" id="pending">...</div>`);
   chat.scrollTop = chat.scrollHeight;
-  history.push({role:"user", content:msg});
   try {
+    // Server owns the conversation memory now — we only send the new message.
     const res = await fetch("{{ url_for('api_chat') }}", { method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ context: ctx, messages: history }) });
+      body: JSON.stringify({ message: msg }) });
     const d = await res.json();
     const reply = d.reply || d.error || "Could not respond.";
     document.getElementById("pending").removeAttribute("id");
     chat.lastElementChild.textContent = reply;
-    history.push({role:"assistant", content:reply});
     chat.scrollTop = chat.scrollHeight;
   } catch(e) {
     document.getElementById("pending").textContent = "Could not reach AI.";
   }
 }
+// jump to the latest message if there's preloaded history
+document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight;
 </script>
 {% endblock %}

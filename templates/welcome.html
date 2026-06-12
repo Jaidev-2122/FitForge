@@ -39,39 +39,39 @@
 const QUESTIONS = [
   // ---- Tier 1: the basics ----
   {key:"age", q:"How old are you?", type:"number", tier:1},
-  {key:"biological_sex", q:"Biological sex? (it affects how you respond to training and recovery)", type:"choice", options:["male","female","other"], tier:1},
+  {key:"biological_sex", q:"Biological sex? (affects training & recovery response)", type:"choice", options:["male","female","other"], tier:1},
   {key:"height_cm", q:"Your height in cm?", type:"number", tier:1},
   {key:"weight_kg", q:"Current weight in kg?", type:"number", tier:1},
-  {key:"target_weight_kg", q:"Is there a weight you're aiming for? (cm/kg — leave blank if unsure)", type:"text", tier:1, optional:true},
-  {key:"country", q:"Which country are you in? (so food suggestions are local and cheap)", type:"text", tier:1},
-  {key:"body_type", q:"How would you describe your current build?", type:"choice", options:["Lean / slim","Average","Carrying some extra weight","Larger / heavier","Muscular already"], tier:1},
+  {key:"country", q:"Which country are you in? (for cheap local food ideas)", type:"text", tier:1},
+  {key:"body_type", q:"How would you describe your current build?", type:"choice", options:["Lean / slim","Average","Carrying extra weight","Larger / heavier","Already muscular"], tier:1},
 
-  // ---- Tier 2: training background ----
-  {key:"history", q:"What's your training history?", type:"choice", options:["Total beginner","Trained a bit before","Trained seriously, took a break","Currently training"], tier:2},
-  {key:"why_stopped", q:"If you've stopped training before, what actually got in the way? (be honest — boredom, time, injury, motivation?)", type:"text", tier:2, optional:true},
-  {key:"experience_lifts", q:"How comfortable are you with weights like squats, deadlifts and presses?", type:"choice", options:["Never done them","Done them, unsure on form","Comfortable","Very experienced"], tier:2},
-  {key:"goal", q:"What's the main outcome you want?", type:"choice", options:["Lose fat / get leaner","Build muscle / get bigger","Get stronger","Tone up & stay healthy","Improve endurance / fitness"], tier:2},
-  {key:"goal_why", q:"What's the real reason behind that goal? (an event, confidence, health, energy — this helps me keep you motivated)", type:"text", tier:2, optional:true},
-  {key:"target_areas", q:"Any body areas you most want to focus on?", type:"choice", options:["Whole body evenly","Upper body","Lower body / glutes & legs","Core / midsection","Posture & back"], tier:2},
-  {key:"days_per_week", q:"Realistically — not ideally — how many days a week will you train?", type:"choice", options:["2","3","4","5","6"], tier:2},
-  {key:"session_length", q:"How long can a typical session actually be?", type:"choice", options:["20-30 min","30-45 min","45-60 min","60-90 min"], tier:2},
-  {key:"equipment", q:"What do you have access to?", type:"choice", options:["Full gym","Home with dumbbells/bands","Bodyweight only","Mix of home + gym"], tier:2},
-  {key:"preferred_style", q:"What kind of training appeals to you most?", type:"choice", options:["Lifting weights","Bodyweight / calisthenics","Circuits / HIIT","A mix of everything","Not sure yet"], tier:2},
-  {key:"enjoyed_before", q:"Any exercise or activity you've genuinely enjoyed before? (sport, dance, running, anything)", type:"text", tier:2, optional:true},
-  {key:"disliked", q:"Anything you really dislike or want to avoid in workouts?", type:"text", tier:2, optional:true},
+  // ---- Tier 2: capacity & goals (this is where the AI calibrates YOU) ----
+  {key:"history", q:"Your training history?", type:"choice", options:["Total beginner","Trained a bit before","Trained seriously, took a break","Currently training"], tier:2},
+  {key:"experience_lifts", q:"Comfort with barbell lifts (squat, deadlift, press)?", type:"choice", options:["Never done them","Tried, shaky on form","Comfortable","Very experienced"], tier:2},
+  {key:"pushup_max", q:"Right now, how many full push-ups could you do in one go? (knees-down counts as 0-5)", type:"choice", options:["0-5","6-15","16-30","30+"], tier:2},
+  {key:"pullup_ability", q:"Can you do a pull-up?", type:"choice", options:["Not yet","1-3 reps","4-10 reps","10+ reps"], tier:2},
+  {key:"plank_hold", q:"How long can you hold a solid plank?", type:"choice", options:["Under 20s","20-45s","45-90s","90s+"], tier:2},
+  {key:"squat_depth", q:"Can you sit into a full deep squat (heels down) comfortably?", type:"choice", options:["No — heels lift / I fall back","Only partway","Yes but it's tight","Yes, easily"], tier:2},
+  {key:"toe_touch", q:"Standing with straight legs, how far can you reach?", type:"choice", options:["Can't reach past knees","Mid-shin","Touch my toes","Palms flat on floor"], tier:2},
+  {key:"posture_issues", q:"Any of these sound like you? (pick the biggest one)", type:"choice", options:["Rounded shoulders / hunching","Forward head from screens","Lower back arches or aches","Stiff hips from sitting","None really"], tier:2},
+  {key:"flexibility_goal", q:"How much do you care about flexibility & mobility vs pure strength?", type:"choice", options:["Strength only — minimal stretching","Mostly strength, some mobility","50/50 — I want both","Flexibility is a top goal"], tier:2},
+  {key:"goal", q:"The main outcome you want?", type:"choice", options:["Lose fat / get leaner","Build muscle / get bigger","Get stronger","Fix posture & move better","Improve endurance / fitness"], tier:2},
+  {key:"goal_why", q:"What's the REAL reason behind that goal? (event, confidence, health, energy — be honest, I use this to keep you going)", type:"text", tier:2, optional:true},
+  {key:"target_areas", q:"Any areas you most want to develop?", type:"choice", options:["Whole body evenly","Chest & arms","Back & shoulders","Glutes & legs","Core / midsection"], tier:2},
+  {key:"preferred_style", q:"What kind of training actually appeals to you?", type:"choice", options:["Lifting weights","Bodyweight / calisthenics","Circuits / HIIT","Mix of everything","Not sure yet"], tier:2},
 
-  // ---- Tier 3: body, recovery, lifestyle ----
-  {key:"injuries", q:"Any injuries, pain points, or movements you should avoid? (knees, back, shoulders…)", type:"text", tier:3, optional:true},
-  {key:"medical", q:"Any health conditions I should train around? (heart, blood pressure, asthma — leave blank if none)", type:"text", tier:3, optional:true},
-  {key:"activity_level", q:"Outside workouts, how active is your day?", type:"choice", options:["Mostly sitting","Lightly active","On my feet a lot","Physically demanding job"], tier:3},
-  {key:"energy", q:"How are your energy levels through a normal day?", type:"choice", options:["Low / often tired","Up and down","Generally good","High"], tier:3},
-  {key:"sleep", q:"How many hours do you usually sleep?", type:"number", tier:3},
-  {key:"stress", q:"How would you rate your daily stress?", type:"choice", options:["Low","Moderate","High","Very high"], tier:3},
-  {key:"diet_now", q:"How would you honestly describe how you eat right now?", type:"choice", options:["Pretty clean","Average / mixed","Lots of takeaway & snacks","All over the place"], tier:3},
-  {key:"diet_restrictions", q:"Any dietary restrictions or preferences? (vegetarian, vegan, halal, allergies…)", type:"text", tier:3, optional:true},
-  {key:"water_now", q:"Roughly how much water do you drink daily?", type:"choice", options:["Barely any","A few glasses","Around 1-2 litres","2 litres or more"], tier:3},
-  {key:"motivation_style", q:"What keeps you going best?", type:"choice", options:["Tough love / push me hard","Encouragement & positivity","Data & progress numbers","Streaks & gamification"], tier:3},
-  {key:"biggest_obstacle", q:"Last one — what's the single biggest thing that usually stops you sticking to a routine?", type:"text", tier:3, optional:true},
+  // ---- Tier 3: schedule, recovery, life ----
+  {key:"days_per_week", q:"Realistically — not ideally — days per week you'll train?", type:"choice", options:["2","3","4","5","6"], tier:3},
+  {key:"session_length", q:"How long can a session actually be?", type:"choice", options:["20-30 min","30-45 min","45-60 min","60-90 min"], tier:3},
+  {key:"train_time", q:"When will you usually train?", type:"choice", options:["Early morning","Midday","Evening","Late night","Varies"], tier:3},
+  {key:"equipment", q:"What do you have access to?", type:"choice", options:["Full gym","Home with dumbbells/bands","Bodyweight only","Mix of home + gym"], tier:3},
+  {key:"injuries", q:"Any injuries, pain points, or movements to avoid? (knees, back, shoulders…)", type:"text", tier:3, optional:true},
+  {key:"sitting_hours", q:"Hours per day you spend sitting (desk, commute, gaming)?", type:"choice", options:["Under 4","4-7","8-10","10+"], tier:3},
+  {key:"sleep", q:"Hours of sleep on a typical night?", type:"number", tier:3},
+  {key:"recovery_speed", q:"After a hard workout, how sore are you 2 days later?", type:"choice", options:["Barely sore","A bit, fades fast","Quite sore","Wrecked for days"], tier:3},
+  {key:"diet_restrictions", q:"Any dietary restrictions? (vegetarian, vegan, halal, allergies… blank if none)", type:"text", tier:3, optional:true},
+  {key:"motivation_style", q:"What keeps you going best?", type:"choice", options:["Tough love — push me hard","Encouragement & positivity","Data & progress numbers","Streaks & gamification"], tier:3},
+  {key:"biggest_obstacle", q:"Last one — what's the single biggest thing that usually stops you sticking to a routine? Be honest.", type:"text", tier:3, optional:true},
 ];
 
 const TIER_LABELS = {1:"The basics", 2:"Your training", 3:"Body & lifestyle"};
@@ -133,20 +133,32 @@ function prev() { if (step > 0) { step--; render(); } }
 async function build() {
   document.getElementById("quiz").style.display = "none";
   document.getElementById("builder").style.display = "block";
-  const msgs = ["Saving your profile...", "AI is building your pilot-week routine...", "Generating your nutrition plan..."];
-  let mi = 0;
   const msgEl = document.getElementById("build-msg");
-  const iv = setInterval(() => { mi = (mi + 1) % msgs.length; msgEl.textContent = msgs[mi]; }, 2500);
+
+  msgEl.textContent = "Saving your profile...";
   try {
+    // Step 1: build routine (one Gemini call)
     const res = await fetch("{{ url_for('onboarding_complete') }}", {
       method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(answers)
     });
     const data = await res.json();
-    clearInterval(iv);
-    if (data.ok) { location.href = "{{ url_for('dashboard') }}"; }
-    else { msgEl.textContent = "Error: " + (data.error || "failed") + ". Is your Gemini key set?"; }
+    if (!data.ok) {
+      msgEl.textContent = "Error: " + (data.error || "failed") + ". Is your Gemini key set?";
+      return;
+    }
+
+    // Step 2: nutrition brief (second Gemini call, separate request to keep memory low)
+    msgEl.textContent = "Building your nutrition plan...";
+    try {
+      await fetch("{{ url_for('onboarding_diet') }}", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(answers)
+      });
+    } catch(_) { /* diet brief is non-critical — carry on */ }
+
+    msgEl.textContent = "All done! Taking you to your dashboard...";
+    setTimeout(() => { location.href = "{{ url_for('dashboard') }}"; }, 800);
+
   } catch (e) {
-    clearInterval(iv);
     msgEl.textContent = "Network error: " + e.message;
   }
 }

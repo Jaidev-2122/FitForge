@@ -370,3 +370,102 @@ input,select,textarea { font-family:inherit; font-size:inherit; }
   position: relative; inset: auto;
 }
 .preset-swatch.active { outline: 2px solid var(--accent-1); outline-offset: 1px; }
+
+/* ============================================================
+   Interactive feel: hover lift, press, glow — applied app-wide
+   ============================================================ */
+.card, .lib-card, .ex-row, .week-day, .macro, .field-box {
+  transition: transform .18s ease, box-shadow .18s ease,
+              border-color .18s ease, background-color .25s ease;
+}
+.card:hover, .macro:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0,0,0,.35),
+              0 0 0 1px color-mix(in srgb, var(--accent-1) 25%, transparent);
+  border-color: color-mix(in srgb, var(--accent-1) 35%, var(--border));
+}
+.lib-card:hover {
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  border-color: var(--accent-1);
+}
+.ex-row:hover {
+  transform: translateX(4px);
+  border-color: color-mix(in srgb, var(--accent-1) 40%, var(--border));
+}
+.week-day:hover { transform: translateY(-2px); border-color: var(--accent-1); }
+
+/* buttons: lift on hover, squash on press, glow on primary */
+.btn { transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; }
+.btn:hover { transform: translateY(-1.5px); }
+.btn:active { transform: translateY(0) scale(0.96); }
+.btn-primary:hover {
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--accent-1) 45%, transparent);
+  filter: brightness(1.06);
+}
+.btn-ghost:hover { border-color: var(--accent-1); color: var(--accent-1); }
+
+/* sidebar items glide */
+.sb-item { transition: transform .15s ease, background-color .2s ease, color .2s ease; }
+.sb-item:hover { transform: translateX(4px); }
+.sb-item:active { transform: translateX(4px) scale(0.98); }
+
+/* inputs glow on focus */
+.input:focus, .auth-input:focus {
+  border-color: var(--accent-1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-1) 18%, transparent);
+}
+
+/* quiz options + chips feel tactile */
+.ob-opt, .chip, .bg-opt, .preset-swatch, .theme-opt, .auth-tab, .method-tab {
+  transition: transform .15s ease, border-color .2s ease,
+              background-color .2s ease, color .2s ease;
+}
+.ob-opt:hover { transform: translateY(-2px); border-color: var(--accent-1); }
+.ob-opt:active { transform: scale(0.97); }
+.chip:hover, .bg-opt:hover, .theme-opt:hover { transform: translateY(-1px); }
+
+/* page content entrance */
+.page > * { animation: fadeUp .45s ease backwards; }
+.page > *:nth-child(1){animation-delay:.02s}
+.page > *:nth-child(2){animation-delay:.07s}
+.page > *:nth-child(3){animation-delay:.12s}
+.page > *:nth-child(4){animation-delay:.17s}
+.page > *:nth-child(5){animation-delay:.22s}
+
+/* modal pop-in */
+.modal { animation: modalIn .25s cubic-bezier(.34,1.4,.64,1) backwards; }
+@keyframes modalIn { from { opacity:0; transform: scale(.92) translateY(10px); } }
+
+/* EXP bars shimmer */
+.bar-fill { position: relative; overflow: hidden; }
+.bar-fill::after {
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent);
+  animation: shimmer 2.6s ease-in-out infinite;
+}
+@keyframes shimmer { 0%{transform:translateX(-100%)} 60%,100%{transform:translateX(100%)} }
+
+/* ---- floating music button ---- */
+.music-btn {
+  position: fixed; bottom: 18px; right: 18px; z-index: 90;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: color-mix(in srgb, var(--bg1) 90%, transparent);
+  border: 1.5px solid var(--border2);
+  color: var(--text2); font-size: 19px; cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: transform .18s ease, border-color .2s ease, color .2s ease, box-shadow .25s ease;
+}
+.music-btn:hover { transform: scale(1.1); border-color: var(--accent-1); color: var(--accent-1); }
+.music-btn.playing {
+  color: var(--accent-1); border-color: var(--accent-1);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent-1) 50%, transparent);
+  animation: musicPulse 2s ease-in-out infinite;
+}
+.music-btn.hint { animation: musicPulse 2s ease-in-out 3; }
+@keyframes musicPulse { 50% { box-shadow: 0 0 26px color-mix(in srgb, var(--accent-1) 65%, transparent); } }
+@media (max-width: 640px) { .music-btn { bottom: 86px; } } /* above bottom nav */
+
+@media (prefers-reduced-motion: reduce) {
+  .page > *, .modal, .bar-fill::after, .music-btn.playing { animation: none; }
+}
