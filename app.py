@@ -311,7 +311,9 @@ def onboarding_complete():
             "Weave in flexibility/mobility/posture work where the answers call for it (desk job, posture issues, poor flexibility, stated stretch goals) — e.g. finish sessions with 1-2 [flexibility] picks, use [mobility] items as warm-ups. It is still their PILOT WEEK, so set targets ~15% below their likely ceiling — but the plan should "
             "still feel clearly built FOR THEM. In ai_summary, explain in 2-3 sentences WHY this plan fits THIS person "
             "(name their goal, days, and one specific choice you made for them).\n"
-            "Output strict JSON only. Schema: {\"ai_summary\": str, \"exp_gate\": int (800-1500), "
+            "Output strict JSON only. No markdown, no fences, no text outside the JSON object. "
+            "Use only ASCII-safe characters in strings — no curly quotes, no apostrophes in labels, no newlines inside strings. "
+            "Schema: {\"ai_summary\": str, \"exp_gate\": int (800-1500), "
             "\"days\": [{\"day_of_week\": 0-6, \"label\": str, \"is_rest\": bool, \"est_duration_min\": int, "
             "\"exercises\": [{\"name\": str, \"target_sets\": int, \"target_reps\": int, \"target_weight_kg\": number-or-null}]}]}. "
             "Use ONLY exercises from this categorized library (the name in each entry must match EXACTLY, "
@@ -321,7 +323,7 @@ def onboarding_complete():
         )
         raw = generate(system=system,
                        parts=[{"text": f"Build the week for this person:\n{json.dumps(answers, indent=2)}"}],
-                       json_mode=True, temperature=0.7)
+                       json_mode=True, temperature=0.7, max_tokens=6000)
         routine = parse_json(raw)
 
         new_routine = d.table("routines").insert({
@@ -377,7 +379,7 @@ def onboarding_diet():
     try:
         draw = generate(system=diet_system,
                         parts=[{"text": json.dumps(answers, indent=2)}],
-                        json_mode=True, temperature=0.5)
+                        json_mode=True, temperature=0.5, max_tokens=1500)
         diet = parse_json(draw)
         db().table("diet_targets").insert({
             "user_id": uid(),
@@ -670,7 +672,7 @@ def planner_evolve():
             f"Profile goal/answers: {json.dumps(profile.get('onboarding_answers'))}\n"
             f"Stage: {profile.get('calibration_stage')}  Streak: {profile.get('current_streak')}\n"
             f"Recent logs (newest first):\n{json.dumps(logs, indent=2)}"}],
-            json_mode=True, temperature=0.6)
+            json_mode=True, temperature=0.6, max_tokens=4000)
         evolved = parse_json(raw)
     except Exception as e:
         return jsonify({"evolved": False, "error": str(e)}), 500
