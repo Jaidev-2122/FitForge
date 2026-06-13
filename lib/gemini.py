@@ -66,5 +66,54 @@ def generate(system: str | None = None, parts: list | None = None,
 
 
 def parse_json(raw: str):
-    cleaned = raw.replace("```json", "").replace("```", "").strip()
-    return json.loads(cleaned)
+    """Parse JSON from a Gemini response robustly.
+
+    Gemini occasionally:
+    - Wraps the JSON in ```json ... ``` fences
+    - Adds a trailing comma before a closing bracket
+    - Includes a BOM or stray whitespace
+    - Returns text after the closing brace
+
+    We try a few recovery strategies before giving up.
+    """
+    import re
+
+    # 1. Strip fences and whitespace
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    cleaned = cleaned.strip()
+
+    # 2. Try direct parse first
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Extract the first {...} block — handles trailing text after the JSON
+    match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    # 4. Strip trailing commas before ] or } (common Gemini mistake)
+    fixed = re.sub(r',\s*([}\]])', r'\1', cleaned)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # 5. If the JSON is truncated (unterminated string), try to close it
+    # by appending the minimum valid closing tokens.
+    # This is a best-effort — partial routines are better than a 500.
+    for suffix in ['"}]}]}', '"}]}', '"]}', ']}', '}']:
+        try:
+            return json.loads(fixed + suffix)
+        except json.JSONDecodeError:
+            continue
+
+    # 6. Give up with a clear error
+    raise ValueError(f"Could not parse Gemini JSON response. First 200 chars: {raw[:200]}")
