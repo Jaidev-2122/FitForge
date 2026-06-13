@@ -466,7 +466,10 @@ def logout():
 @onboarding_required
 def dashboard():
     d = db()
-    apply_missed_workout_penalty()
+    try:
+        apply_missed_workout_penalty()
+    except Exception as e:
+        app.logger.error(f"missed-penalty skipped: {e}")
     profile = get_profile()
     routine = first_row(d.table("routines").select("id,version,ai_summary")
                         .eq("user_id", uid()).eq("is_active", True))
